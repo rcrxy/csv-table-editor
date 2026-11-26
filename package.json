@@ -1,6 +1,6 @@
 {
-    "name": "csv-table-editor",
-    "displayName": "CSV Table Editor",
+    "name": "delimgrid",
+    "displayName": "DelimGrid",
     "author": "zeco",
     "license": "SEE LICENSE IN LICENSE",
     "publisher": "zeco",
@@ -22,7 +22,7 @@
         "customEditors": [
             {
                 "viewType": "csv-table-editor.table",
-                "displayName": "CSV Table Editor",
+                "displayName": "DelimGrid",
                 "selector": [
                     { "filenamePattern": "*.csv" },
                     { "filenamePattern": "*.tsv" }
@@ -32,137 +32,137 @@
         ],
         "commands": [
             {
-                "command": "csv-table-editor.selectDelimiter",
+                "command": "delimgrid.selectDelimiter",
                 "title": "%command.selectDelimiter%"
             },
             {
-                "command": "csv-table-editor.toggleTextWrapping",
+                "command": "delimgrid.toggleTextWrapping",
                 "title": "%command.toggleTextWrapping%",
                 "icon": "$(word-wrap)"
             },
             {
                 "title": "%command.editCell%",
-                "command": "csv-table-editor.editCell",
+                "command": "delimgrid.editCell",
                 "enablement": "true"
             },
             {
-                "command": "csv-table-editor.moveCellSelection",
+                "command": "delimgrid.moveCellSelection",
                 "title": "%command.moveCellSelection%"
             },
             {
-                "command": "csv-table-editor.moveColumnLeft",
+                "command": "delimgrid.moveColumnLeft",
                 "title": "%command.moveColumnLeft%"
             },
             {
-                "command": "csv-table-editor.moveColumnRight",
+                "command": "delimgrid.moveColumnRight",
                 "title": "%command.moveColumnRight%"
             },
             {
-                "command": "csv-table-editor.submitCellEdit",
+                "command": "delimgrid.submitCellEdit",
                 "title": "%command.submitCellEdit%"
             },
             {
-                "command": "csv-table-editor.insertCellLineBreak",
+                "command": "delimgrid.insertCellLineBreak",
                 "title": "%command.insertCellLineBreak%"
             },
             {
                 "title": "%command.clearCell%",
-                "command": "csv-table-editor.clearCell",
+                "command": "delimgrid.clearCell",
                 "enablement": "true"
             },
             {
                 "title": "%command.clearFilter%",
-                "command": "csv-table-editor.clearFilter",
+                "command": "delimgrid.clearFilter",
                 "enablement": "true"
             },
             {
                 "title": "%command.resetAllFilters%",
-                "command": "csv-table-editor.resetAllFilters",
+                "command": "delimgrid.resetAllFilters",
                 "enablement": "true"
             },
             {
                 "title": "%command.freezeCell%",
-                "command": "csv-table-editor.freezeCell",
+                "command": "delimgrid.freezeCell",
                 "enablement": "true"
             },
             {
                 "title": "%command.unfreezeCell%",
-                "command": "csv-table-editor.unfreezeCell",
+                "command": "delimgrid.unfreezeCell",
                 "enablement": "true"
             },
             {
                 "title": "%command.insertRowAbove%",
-                "command": "csv-table-editor.insertRowAbove",
+                "command": "delimgrid.insertRowAbove",
                 "enablement": "true"
             },
             {
                 "title": "%command.insertRowBelow%",
-                "command": "csv-table-editor.insertRowBelow",
+                "command": "delimgrid.insertRowBelow",
                 "enablement": "true"
             },
             {
                 "title": "%command.insertColumnLeft%",
-                "command": "csv-table-editor.insertColumnLeft",
+                "command": "delimgrid.insertColumnLeft",
                 "enablement": "true"
             },
             {
                 "title": "%command.insertColumnRight%",
-                "command": "csv-table-editor.insertColumnRight",
+                "command": "delimgrid.insertColumnRight",
                 "enablement": "true"
             },
             {
                 "title": "%command.deleteRow%",
-                "command": "csv-table-editor.deleteRow",
+                "command": "delimgrid.deleteRow",
                 "enablement": "true"
             },
             {
                 "title": "%command.deleteColumn%",
-                "command": "csv-table-editor.deleteColumn",
+                "command": "delimgrid.deleteColumn",
                 "enablement": "true"
             },
             {
                 "title": "%command.clearAndReloadTable%",
-                "command": "csv-table-editor.clearAndReloadTable",
+                "command": "delimgrid.clearAndReloadTable",
                 "enablement": "true"
             }
         ],
         "keybindings": [
             {
-                "command": "csv-table-editor.moveCellSelection",
+                "command": "delimgrid.moveCellSelection",
                 "key": "up",
                 "args": "up",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
             },
             {
-                "command": "csv-table-editor.moveCellSelection",
+                "command": "delimgrid.moveCellSelection",
                 "key": "down",
                 "args": "down",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
             },
             {
-                "command": "csv-table-editor.moveCellSelection",
+                "command": "delimgrid.moveCellSelection",
                 "key": "left",
                 "args": "left",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
             },
             {
-                "command": "csv-table-editor.moveCellSelection",
+                "command": "delimgrid.moveCellSelection",
                 "key": "right",
                 "args": "right",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
             },
             {
-                "command": "csv-table-editor.editCell",
+                "command": "delimgrid.editCell",
                 "key": "enter",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
             },
             {
-                "command": "csv-table-editor.insertCellLineBreak",
+                "command": "delimgrid.insertCellLineBreak",
                 "key": "enter",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
             },
             {
-                "command": "csv-table-editor.submitCellEdit",
+                "command": "delimgrid.submitCellEdit",
                 "key": "ctrl+enter",
                 "args": true,
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
@@ -178,12 +178,12 @@
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.canMoveTableStructure"
             },
             {
-                "command": "csv-table-editor.moveColumnLeft",
+                "command": "delimgrid.moveColumnLeft",
                 "key": "alt+left",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.canMoveTableStructure"
             },
             {
-                "command": "csv-table-editor.moveColumnRight",
+                "command": "delimgrid.moveColumnRight",
                 "key": "alt+right",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.canMoveTableStructure"
             }
@@ -191,85 +191,85 @@
         "menus": {
             "editor/title": [
                 {
-                    "command": "csv-table-editor.toggleTextWrapping",
+                    "command": "delimgrid.toggleTextWrapping",
                     "when": "activeCustomEditorId == 'csv-table-editor.table'",
                     "group": "navigation"
                 }
             ],
             "commandPalette": [
-                { "command": "csv-table-editor.toggleTextWrapping", "when": "false" },
-                { "command": "csv-table-editor.editCell", "when": "false" },
-                { "command": "csv-table-editor.moveCellSelection", "when": "false" },
-                { "command": "csv-table-editor.moveColumnLeft", "when": "false" },
-                { "command": "csv-table-editor.moveColumnRight", "when": "false" },
-                { "command": "csv-table-editor.submitCellEdit", "when": "false" },
-                { "command": "csv-table-editor.insertCellLineBreak", "when": "false" },
-                { "command": "csv-table-editor.clearCell", "when": "false" },
-                { "command": "csv-table-editor.clearFilter", "when": "false" },
-                { "command": "csv-table-editor.resetAllFilters", "when": "false" },
-                { "command": "csv-table-editor.freezeCell", "when": "false" },
-                { "command": "csv-table-editor.unfreezeCell", "when": "false" },
-                { "command": "csv-table-editor.insertRowAbove", "when": "false" },
-                { "command": "csv-table-editor.insertRowBelow", "when": "false" },
-                { "command": "csv-table-editor.insertColumnLeft", "when": "false" },
-                { "command": "csv-table-editor.insertColumnRight", "when": "false" },
-                { "command": "csv-table-editor.deleteRow", "when": "false" },
-                { "command": "csv-table-editor.deleteColumn", "when": "false" },
-                { "command": "csv-table-editor.clearAndReloadTable", "when": "false" }
+                { "command": "delimgrid.toggleTextWrapping", "when": "false" },
+                { "command": "delimgrid.editCell", "when": "false" },
+                { "command": "delimgrid.moveCellSelection", "when": "false" },
+                { "command": "delimgrid.moveColumnLeft", "when": "false" },
+                { "command": "delimgrid.moveColumnRight", "when": "false" },
+                { "command": "delimgrid.submitCellEdit", "when": "false" },
+                { "command": "delimgrid.insertCellLineBreak", "when": "false" },
+                { "command": "delimgrid.clearCell", "when": "false" },
+                { "command": "delimgrid.clearFilter", "when": "false" },
+                { "command": "delimgrid.resetAllFilters", "when": "false" },
+                { "command": "delimgrid.freezeCell", "when": "false" },
+                { "command": "delimgrid.unfreezeCell", "when": "false" },
+                { "command": "delimgrid.insertRowAbove", "when": "false" },
+                { "command": "delimgrid.insertRowBelow", "when": "false" },
+                { "command": "delimgrid.insertColumnLeft", "when": "false" },
+                { "command": "delimgrid.insertColumnRight", "when": "false" },
+                { "command": "delimgrid.deleteRow", "when": "false" },
+                { "command": "delimgrid.deleteColumn", "when": "false" },
+                { "command": "delimgrid.clearAndReloadTable", "when": "false" }
             ],
             "webview/context": [
                 {
-                    "command": "csv-table-editor.editCell",
+                    "command": "delimgrid.editCell",
                     "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell'",
                     "group": "1_cell@1"
                 },
                 {
-                    "command": "csv-table-editor.clearCell",
+                    "command": "delimgrid.clearCell",
                     "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell'",
                     "group": "1_cell@2"
                 },
                 {
-                    "command": "csv-table-editor.freezeCell",
+                    "command": "delimgrid.freezeCell",
                     "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell' && canFreezePanes",
                     "group": "3_freeze@1"
                 },
                 {
-                    "command": "csv-table-editor.unfreezeCell",
+                    "command": "delimgrid.unfreezeCell",
                     "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell' && hasFrozenPanes",
                     "group": "3_freeze@2"
                 },
                 {
-                    "command": "csv-table-editor.insertRowAbove",
+                    "command": "delimgrid.insertRowAbove",
                     "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'row')",
                     "group": "4_row@1"
                 },
                 {
-                    "command": "csv-table-editor.insertRowBelow",
+                    "command": "delimgrid.insertRowBelow",
                     "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'row')",
                     "group": "4_row@2"
                 },
                 {
-                    "command": "csv-table-editor.insertColumnLeft",
+                    "command": "delimgrid.insertColumnLeft",
                     "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'header')",
                     "group": "5_column@1"
                 },
                 {
-                    "command": "csv-table-editor.insertColumnRight",
+                    "command": "delimgrid.insertColumnRight",
                     "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'header')",
                     "group": "5_column@2"
                 },
                 {
-                    "command": "csv-table-editor.deleteRow",
+                    "command": "delimgrid.deleteRow",
                     "when": "webviewId == 'csv-table-editor.table' && canDeleteTableRow",
                     "group": "6_delete@1"
                 },
                 {
-                    "command": "csv-table-editor.deleteColumn",
+                    "command": "delimgrid.deleteColumn",
                     "when": "webviewId == 'csv-table-editor.table' && canDeleteTableColumn",
                     "group": "6_delete@2"
                 },
                 {
-                    "command": "csv-table-editor.clearAndReloadTable",
+                    "command": "delimgrid.clearAndReloadTable",
                     "when": "webviewId == 'csv-table-editor.table'",
                     "group": "6_delete@3"
                 }

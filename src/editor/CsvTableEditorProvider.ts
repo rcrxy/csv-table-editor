@@ -137,7 +137,7 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
                vscode.commands.registerCommand(command, () => this.runTableAction({ kind: "moveTableStructure", direction })),
             );
          } catch (error) {
-            console.warn(`Could not handle ${command} in CSV Table Editor.`, error);
+            console.warn(`Could not handle ${command} in DelimGrid.`, error);
          }
       }
       return vscode.Disposable.from(...handlers);
@@ -155,7 +155,7 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
       if (session) {
          await session.selectDelimiter();
       } else {
-         void vscode.window.showInformationMessage("Open a CSV or TSV file in CSV Table Editor first.");
+         void vscode.window.showInformationMessage("Open a CSV or TSV file in DelimGrid first.");
       }
    }
 }
@@ -344,7 +344,7 @@ class DocumentController {
             { label: "Custom…", value: "custom" },
          ];
          const choice = await vscode.window.showQuickPick(choices, {
-            title: "CSV Table Editor: Select Delimiter",
+            title: "DelimGrid: Select Delimiter",
             placeHolder: this.manualDelimiter ? "Choose a delimiter for this file" : "Auto detect is active",
          });
          if (!choice || this.disposed) {

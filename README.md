@@ -1,13 +1,13 @@
-# CSV Table Editor
+# DelimGrid
 
 在 VS Code 中以表格形式查看和编辑 CSV、TSV 文件。编辑会同步到 VS Code 文档，可使用原生保存、撤销和重做。
 
 ## 安装和打开
 
-支持 VS Code 1.x，最低版本为 1.146.0。扩展 ID 为 `zeco.csv-table-editor`。
+支持 VS Code 1.x，最低版本为 1.146.0。扩展 ID 为 `zeco.delimgrid`。
 
 1. 拿到 `.vsix` 文件后，在扩展视图右上角的菜单选择 **从 VSIX 安装…**，并选中该文件。 [VS Code 安装说明](https://code.visualstudio.com/docs/configure/extensions/extension-marketplace#_install-from-a-vsix)
-2. 打开 `.csv` 或 `.tsv` 文件。需要切换视图时，右键点击编辑器标签页并选择 **Reopen Editor With…**，然后选 **CSV Table Editor** 或 **Text Editor**。
+2. 打开 `.csv` 或 `.tsv` 文件。需要切换视图时，右键点击编辑器标签页并选择 **Reopen Editor With…**，然后选 **DelimGrid** 或 **Text Editor**。
 
 ## 编辑和查看
 
@@ -43,7 +43,7 @@
 | `csv-table-editor.tableHeader` | `true` | 使用第一条记录作为表头。关闭后第一条记录显示在数据区，列名使用 `Column 1` 等默认名称。设置即时生效。 |
 | `csv-table-editor.showRowNumbers` | `true` | 显示每条记录在源文件中的起始行号。设置即时生效。 |
 
-在命令面板运行 **CSV 表格编辑器：选择分隔符**（**CSV Table Editor: Select Delimiter**），可以恢复自动识别、选择常见分隔符，或输入一个自定义分隔字符。自动识别不明确时，`.csv` 使用逗号，`.tsv` 使用制表符。手动选择会在当前工作区内按文件记忆。
+在命令面板运行 **DelimGrid：选择分隔符**（**DelimGrid: Select Delimiter**），可以恢复自动识别、选择常见分隔符，或输入一个自定义分隔字符。自动识别不明确时，`.csv` 使用逗号，`.tsv` 使用制表符。手动选择会在当前工作区内按文件记忆。
 
 ## Git 变更
 
@@ -69,7 +69,7 @@ esbuild 监听入口及其导入的资源。新增 Webview 静态资源时，从
 npm run package:vsix
 ```
 
-命令按需获取官方 `@vscode/vsce`，执行现有生产构建，并在项目根目录生成 `csv-table-editor-<版本>.vsix`。运行依赖由 esbuild 打入构建产物。 [VS Code 打包说明](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#packaging-extensions)
+命令按需获取官方 `@vscode/vsce`，执行现有生产构建，并在项目根目录生成 `delimgrid-<版本>.vsix`。运行依赖由 esbuild 打入构建产物。 [VS Code 打包说明](https://code.visualstudio.com/api/working-with-extensions/publishing-extension#packaging-extensions)
 
 ## 许可证
 

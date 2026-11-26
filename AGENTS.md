@@ -1,4 +1,4 @@
-# CSV Table Editor
+# DelimGrid
 
 ## 硬约束（优先级最高，与下文任何内容冲突时以本节为准）
 

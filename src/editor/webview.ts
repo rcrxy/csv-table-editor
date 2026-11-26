@@ -15,7 +15,7 @@ export function configureWebview(webview: vscode.Webview, extensionUri: vscode.U
    <meta name="viewport" content="width=device-width, initial-scale=1">
    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'">
    <link rel="stylesheet" href="${styles}">
-   <title>CSV Table Editor</title>
+   <title>DelimGrid</title>
 </head>
 <body>
    <script nonce="${nonce}" src="${script}"></script>
