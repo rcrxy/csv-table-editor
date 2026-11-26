@@ -11,14 +11,6 @@ const vscode = acquireVsCodeApi();
 document.body.insertAdjacentHTML("afterbegin", markup);
 const tableElement = document.getElementById("table")!;
 const statusElement = document.getElementById("status")!;
-const delimiterButton = button("delimiter");
-const addRow = button("add-row");
-const deleteRow = button("delete-row");
-const addColumn = button("add-column");
-const deleteColumn = button("delete-column");
-const rename = button("rename");
-const freeze = button("freeze");
-const reset = button("reset-view");
 const widths = new Map<string, number>();
 
 let snapshot: Snapshot | undefined;
@@ -141,25 +133,25 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
    });
 });
 
-delimiterButton.onclick = () => vscode.postMessage({ type: "delimiter" });
-addRow.onclick = () => send({ kind: "addRow" });
-deleteRow.onclick = () => selectedRow !== undefined && send({ kind: "deleteRow", row: selectedRow });
-addColumn.onclick = () => send({ kind: "addColumn" });
-deleteColumn.onclick = () => selectedColumn !== undefined && send({ kind: "deleteColumn", column: selectedColumn });
-rename.onclick = () => selectedColumn !== undefined && send({ kind: "rename", column: selectedColumn });
-freeze.onclick = () => {
-   if (snapshot) {
-      const count = selectedColumn === undefined ? 0 : selectedColumn + 1;
-      frozenCount = frozenCount === count ? 0 : count;
-      applyColumns(snapshot);
-      refreshControls();
-   }
-};
-reset.onclick = () => {
-   table.clearFilter(true);
-   table.clearSort();
-   refreshControls();
-};
+// delimiterButton.onclick = () => vscode.postMessage({ type: "delimiter" });
+// addRow.onclick = () => send({ kind: "addRow" });
+// deleteRow.onclick = () => selectedRow !== undefined && send({ kind: "deleteRow", row: selectedRow });
+// addColumn.onclick = () => send({ kind: "addColumn" });
+// deleteColumn.onclick = () => selectedColumn !== undefined && send({ kind: "deleteColumn", column: selectedColumn });
+// rename.onclick = () => selectedColumn !== undefined && send({ kind: "rename", column: selectedColumn });
+// freeze.onclick = () => {
+//    if (snapshot) {
+//       const count = selectedColumn === undefined ? 0 : selectedColumn + 1;
+//       frozenCount = frozenCount === count ? 0 : count;
+//       applyColumns(snapshot);
+//       refreshControls();
+//    }
+// };
+// reset.onclick = () => {
+//    table.clearFilter(true);
+//    table.clearSort();
+//    refreshControls();
+// };
 
 tableElement.addEventListener("keydown", (event) => {
    if (
@@ -296,8 +288,6 @@ function applyColumns(next: Snapshot): void {
          field,
          sorter: "string",
          headerSortTristate: true,
-         headerFilter: "input",
-         headerFilterPlaceholder: "Filter",
          frozen: index < frozenCount,
          width: widths.get(field) ?? 170,
          minWidth: 80,
@@ -359,27 +349,29 @@ async function render(next: Snapshot): Promise<void> {
 function refreshControls(): void {
    const busy = pending !== undefined || queuedSnapshots > 0 || editingCell !== undefined;
    const editable = !!snapshot && !snapshot.error && !busy;
-   delimiterButton.disabled = !snapshot || busy;
-   addRow.disabled = !editable;
-   deleteRow.disabled = !editable || selectedRow === undefined;
-   addColumn.disabled = !editable;
-   deleteColumn.disabled = !editable || selectedColumn === undefined || (snapshot?.columnCount ?? 0) < 2;
-   rename.disabled = !editable || selectedColumn === undefined;
-   freeze.disabled = !editable || (selectedColumn === undefined && frozenCount === 0);
+   // delimiterButton.disabled = !snapshot || busy;
+   // addRow.disabled = !editable;
+   // deleteRow.disabled = !editable || selectedRow === undefined;
+   // addColumn.disabled = !editable;
+   // deleteColumn.disabled = !editable || selectedColumn === undefined || (snapshot?.columnCount ?? 0) < 2;
+   // rename.disabled = !editable || selectedColumn === undefined;
+   // freeze.disabled = !editable || (selectedColumn === undefined && frozenCount === 0);
    const unfreeze = frozenCount > 0 && (selectedColumn === undefined || frozenCount === selectedColumn + 1);
-   freeze.textContent = unfreeze ? "Unfreeze columns" : "Freeze through column";
-   reset.disabled = !snapshot || busy || !hasViewOrder();
+   // freeze.textContent = unfreeze ? "Unfreeze columns" : "Freeze through column";
+   // reset.disabled = !snapshot || busy || !hasViewOrder();
    if (!snapshot) {
       return;
    }
    const delimiter = snapshot.delimiter === "\t" ? "Tab" : snapshot.delimiter === " " ? "Space" : snapshot.delimiter;
-   delimiterButton.textContent = `Delimiter: ${delimiter}${snapshot.autoDelimiter ? " (auto)" : ""}`;
+   // delimiterButton.textContent = `Delimiter: ${delimiter}${snapshot.autoDelimiter ? " (auto)" : ""}`;
    statusElement.classList.toggle("error", !!snapshot.error);
    const selected = selectedRow === undefined ? undefined : snapshot.records[selectedRow - 1];
    const summary = [
       `${snapshot.records.length} data rows · ${snapshot.columnCount} columns`,
       selected && `Line ${selected.line}`,
       selectedColumn !== undefined && `Column ${selectedColumn + 1}`,
-   ].filter(Boolean).join(" · ");
+   ]
+      .filter(Boolean)
+      .join(" · ");
    statusElement.textContent = snapshot.error ?? (notice || summary);
 }
