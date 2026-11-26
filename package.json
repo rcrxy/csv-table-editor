@@ -259,12 +259,12 @@
                 },
                 {
                     "command": "csv-table-editor.deleteRow",
-                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'row')",
+                    "when": "webviewId == 'csv-table-editor.table' && canDeleteTableRow",
                     "group": "6_delete@1"
                 },
                 {
                     "command": "csv-table-editor.deleteColumn",
-                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'header')",
+                    "when": "webviewId == 'csv-table-editor.table' && canDeleteTableColumn",
                     "group": "6_delete@2"
                 },
                 {
@@ -289,6 +289,12 @@
                     "default": true,
                     "order": 2,
                     "description": "%configuration.tableHeader.description%"
+                },
+                "csv-table-editor.showRowNumbers": {
+                    "type": "boolean",
+                    "default": true,
+                    "order": 3,
+                    "description": "%configuration.showRowNumbers.description%"
                 }
             }
         }

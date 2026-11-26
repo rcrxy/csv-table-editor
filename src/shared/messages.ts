@@ -2,10 +2,12 @@ export type Direction = -1 | 1;
 
 export type TableDirection = "up" | "down" | "left" | "right";
 export type KeyboardMode = "inactive" | "grid" | "editing";
+export type DeleteKind = "deleteRow" | "deleteColumn";
 
 export type TableAction =
    | { kind: "moveCellSelection" | "moveTableStructure"; direction: TableDirection }
    | { kind: "editCell"; target?: { row: number; column: number; revision: number; version: number } }
+   | { kind: "deleteFromMenu"; deleteKind: DeleteKind; target: { field: string; rowId?: number; revision: number; version: number } }
    | { kind: "submitCellEdit"; save: boolean };
 
 export type Operation =
@@ -35,10 +37,12 @@ export interface TableRecord {
 export interface Snapshot {
    revision: number;
    version: number;
+   resource: string;
    delimiter: string;
    autoDelimiter: boolean;
    cellMaxWidth: number;
    tableHeader: boolean;
+   showRowNumbers: boolean;
    columnCount: number;
    header: TableRecord | undefined;
    records: TableRecord[];

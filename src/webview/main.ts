@@ -3,6 +3,7 @@ import "tabulator-tables/dist/css/tabulator.min.css";
 import "./styles.css";
 import markup from "./body.html";
 import type {
+   DeleteKind,
    Direction,
    HostMessage,
    KeyboardMode,
@@ -186,16 +187,47 @@ tableElement.addEventListener("input", ({ target }) => {
 });
 
 type MenuTarget =
-   | { webviewSection: "row"; rowId: number }
+   | { webviewSection: "row"; rowId: number; field?: string }
    | { webviewSection: "cell"; rowId: number; field: string }
    | { webviewSection: "header"; field: string };
 
+// 显示菜单和执行删除共用同一套定位规则。第一行以排序和筛选后的视图为准。
+function menuDeleteOperation(
+   kind: DeleteKind,
+   field: string | undefined,
+   rowId: number | undefined,
+): Extract<Operation, { kind: DeleteKind }> | undefined {
+   if (!snapshot || snapshot.error || field === undefined) {
+      return;
+   }
+   const column = columnIndex(field);
+   if (kind === "deleteRow") {
+      const rowControls = snapshot.showRowNumbers ? field === "_line" : column === 0;
+      if (rowControls && rowId !== undefined && dataRecord(snapshot, rowId)) {
+         return { kind, row: rowId };
+      }
+      return;
+   }
+   if (column === undefined || column >= snapshot.columnCount || snapshot.columnCount < 2) {
+      return;
+   }
+   const row = rowId !== undefined && !snapshot.tableHeader && table.getRow(rowId);
+   if ((rowId === undefined && snapshot.header) || (row && row.getPosition() === 1)) {
+      return { kind, column };
+   }
+}
+
 function setMenuTarget(element: HTMLElement, target: MenuTarget): void {
+   const field = target.field;
+   const rowId = "rowId" in target ? target.rowId : undefined;
    element.dataset.vscodeContext = JSON.stringify({
       ...target,
       revision: snapshot?.revision,
       version: snapshot?.version,
+      tableResource: snapshot?.resource,
       hasFrozenColumns: frozenCount > 0,
+      canDeleteTableRow: !!menuDeleteOperation("deleteRow", field, rowId),
+      canDeleteTableColumn: !!menuDeleteOperation("deleteColumn", field, rowId),
    });
 }
 
@@ -208,11 +240,8 @@ table.on("rowContext", (_event, row) => {
 
 table.on("cellContext", (_event, cell) => {
    const field = cell.getField();
-   if (columnIndex(field) === undefined) {
-      return; // 左侧行号列沿用行菜单。
-   }
    setMenuTarget(cell.getElement(), {
-      webviewSection: "cell",
+      webviewSection: field === "_line" ? "row" : "cell",
       rowId: Number(cell.getRow().getIndex()),
       field,
    });
@@ -333,6 +362,13 @@ function updateKeyboardMode(force = false): void {
 
 function runTableAction(action: TableAction): void {
    if (composing) {
+      return;
+   }
+   if (action.kind === "deleteFromMenu") {
+      const { field, rowId, revision, version } = action.target;
+      if (snapshot?.revision === revision && snapshot.version === version) {
+         send(menuDeleteOperation(action.deleteKind, field, rowId));
+      }
       return;
    }
    if (action.kind === "submitCellEdit") {
@@ -546,10 +582,10 @@ function send(operation: Operation | undefined, save = false): boolean {
    return true;
 }
 
-// 表头或冻结范围变化时才重建列。重建时沿用列宽，并重新应用仍存在的列的排序和筛选值。
+// 列结构变化时重建列，沿用列宽与仍存在的列的排序和筛选值。
 function applyColumns(next: Snapshot): void {
    const headers = Array.from({ length: next.columnCount }, (_, index) => next.header?.values[index] ?? "");
-   const lineDigits = Math.max(4, String(next.records.at(-1)?.line ?? 0).length);
+   const lineDigits = next.showRowNumbers ? Math.max(4, String(next.records.at(-1)?.line ?? 0).length) : undefined;
    const key = JSON.stringify([next.tableHeader, headers, frozenCount, lineDigits]);
    if (key === renderedColumns) {
       return;
@@ -561,21 +597,6 @@ function applyColumns(next: Snapshot): void {
       .filter(({ field }) => (columnIndex(field) ?? Infinity) < headers.length)
       .map(({ field, dir }) => ({ column: field, dir }));
    const filters = table.getHeaderFilters().filter(({ field }) => (columnIndex(field) ?? Infinity) < headers.length);
-   // 最左侧冻结列显示源文件行号和 Git 标记，业务列使用 c0、c1 等内部字段名。
-   const lineWidth = gutter.measureWidth(lineDigits);
-   const stub: ColumnDefinition = {
-      title: "#",
-      titleFormatter: () => (next.header ? gutter.header() : asText("#")),
-      field: "_line",
-      frozen: true,
-      width: lineWidth,
-      minWidth: lineWidth,
-      headerSort: false,
-      resizable: false,
-      hozAlign: "right",
-      cssClass: "gutter-cell",
-      formatter: (cell) => gutter.record({ id: Number(cell.getRow().getIndex()), line: Number(cell.getValue()) }),
-   };
    const columns: ColumnDefinition[] = headers.map((name, index) => {
       const field = `c${index}`;
       const width = widths.get(field) ?? Math.min(80, next.cellMaxWidth);
@@ -610,9 +631,26 @@ function applyColumns(next: Snapshot): void {
          editable: () => !!snapshot && !snapshot.error && pending === undefined && !queuedSnapshots,
       };
    });
+   // 可选的序列号列显示源文件行号和 Git 标记。数据列的字段名与它的显示状态无关。
+   if (lineDigits !== undefined) {
+      const lineWidth = gutter.measureWidth(lineDigits);
+      columns.unshift({
+         title: "#",
+         titleFormatter: () => (next.header ? gutter.header() : asText("#")),
+         field: "_line",
+         frozen: true,
+         width: lineWidth,
+         minWidth: lineWidth,
+         headerSort: false,
+         resizable: false,
+         hozAlign: "right",
+         cssClass: "gutter-cell",
+         formatter: (cell) => gutter.record({ id: Number(cell.getRow().getIndex()), line: Number(cell.getValue()) }),
+      });
+   }
    table.clearSort();
    table.clearHeaderFilter();
-   table.setColumns([stub, ...columns]);
+   table.setColumns(columns);
    if (sorters.length) {
       table.setSort(sorters);
    }

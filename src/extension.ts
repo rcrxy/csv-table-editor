@@ -14,6 +14,12 @@ export function activate(context: vscode.ExtensionContext): void {
          provider.toggleTextWrapping(resource),
       ),
       vscode.commands.registerCommand("csv-table-editor.editCell", (context?: unknown) => provider.editCell(context)),
+      vscode.commands.registerCommand("csv-table-editor.deleteRow", (context: unknown) =>
+         provider.deleteFromMenu("deleteRow", context),
+      ),
+      vscode.commands.registerCommand("csv-table-editor.deleteColumn", (context: unknown) =>
+         provider.deleteFromMenu("deleteColumn", context),
+      ),
       vscode.commands.registerCommand("csv-table-editor.moveCellSelection", (direction: unknown) => {
          if (isTableDirection(direction)) {
             provider.runTableAction({ kind: "moveCellSelection", direction });

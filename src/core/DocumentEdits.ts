@@ -42,6 +42,12 @@ export function documentEdits(
          throw new Error("Select a data record first.");
       }
       if (operation.kind === "deleteRow") {
+         const next = rows[index + 1];
+         // 移到文件开头的字段需要保留原有的 U+FEFF 内容。
+         if (index === 0 && next && text[next.start] === "\uFEFF") {
+            const first = next.fields[0];
+            return [{ start: row.start, end: first.end, text: encodeField(text.slice(first.start, first.end), delimiter) }];
+         }
          const previous = rows[index - 1];
          const start = !row.eol && previous && previous.start !== previous.end ? previous.end : row.start;
          return [{ start, end: row.end + row.eol.length, text: "" }];

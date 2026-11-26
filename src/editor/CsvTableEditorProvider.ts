@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { delimiters, delimiterError, detectDelimiter, parseDocument, type ParsedDocument } from "../core/CsvParser";
 import { documentEdits } from "../core/DocumentEdits";
 import { GitGutter } from "../git/GitGutter";
-import type { HostMessage, KeyboardMode, Operation, Snapshot, TableAction, WebviewMessage } from "../shared/messages";
+import type { DeleteKind, HostMessage, KeyboardMode, Operation, Snapshot, TableAction, WebviewMessage } from "../shared/messages";
 import { configureWebview } from "./webview";
 
 export const viewType = "csv-table-editor.table";
@@ -62,6 +62,30 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
             kind: "editCell",
             target: { row: rowId, column: Number(context.field.slice(1)), revision, version },
          });
+      }
+   }
+
+   deleteFromMenu(kind: DeleteKind, context: unknown): void {
+      const session = this.activeSession();
+      if (
+         !session ||
+         !isRecord(context) ||
+         context.webview !== viewType ||
+         context.tableResource !== session.document.uri.toString()
+      ) {
+         return;
+      }
+      const allowed = kind === "deleteRow" ? context.canDeleteTableRow : context.canDeleteTableColumn;
+      const { field, rowId, revision, version } = context;
+      if (
+         allowed === true &&
+         typeof field === "string" &&
+         /^(_line|c\d+)$/.test(field) &&
+         (rowId === undefined || (typeof rowId === "number" && Number.isSafeInteger(rowId))) &&
+         typeof revision === "number" &&
+         typeof version === "number"
+      ) {
+         session.runTableAction({ kind: "deleteFromMenu", deleteKind: kind, target: { field, rowId, revision, version } });
       }
    }
 
@@ -178,7 +202,10 @@ class DocumentController {
             }
          }),
          vscode.workspace.onDidChangeConfiguration((event) => {
-            if (event.affectsConfiguration("csv-table-editor.tableHeader", document.uri)) {
+            if (
+               event.affectsConfiguration("csv-table-editor.tableHeader", document.uri) ||
+               event.affectsConfiguration("csv-table-editor.showRowNumbers", document.uri)
+            ) {
                this.sync(true);
             }
          }),
@@ -259,10 +286,12 @@ class DocumentController {
       this.snapshot = {
          revision: (this.snapshot?.revision ?? 0) + 1,
          version: this.document.version,
+         resource: this.document.uri.toString(),
          delimiter,
          autoDelimiter: this.manualDelimiter === undefined,
          cellMaxWidth: this.cellMaxWidth,
          tableHeader,
+         showRowNumbers: config.get<boolean>("showRowNumbers", true) !== false,
          columnCount: this.parsed?.columnCount ?? 0,
          header: tableHeader ? records[0] : undefined,
          records: tableHeader ? records.slice(1) : records,
