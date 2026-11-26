@@ -113,15 +113,20 @@ button:focus-visible,
    text-overflow: ellipsis;
 }
 
-/* 表头悬浮和选中列共用背景，选中列另有顶部描边。 */
-.tabulator .tabulator-header .tabulator-col.tabulator-sortable:hover,
+/* 选中列保留背景和顶部描边。 */
 .tabulator .tabulator-header .tabulator-col.selected-column {
    background: var(--vscode-list-hoverBackground);
    color: var(--vscode-list-hoverForeground, var(--vscode-editor-foreground));
+   box-shadow: inset 0 2px var(--vscode-focusBorder);
 }
 
-.tabulator .tabulator-header .tabulator-col.selected-column {
-   box-shadow: inset 0 2px var(--vscode-focusBorder);
+/* 表头和数据行悬浮时使用 VS Code 菜单项的高亮色。 */
+@media (hover: hover) and (pointer: fine) {
+   .tabulator .tabulator-header .tabulator-col.tabulator-sortable:hover,
+   .tabulator .tabulator-row.tabulator-selectable:hover {
+      background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+      color: var(--vscode-menu-selectionForeground, var(--vscode-editor-foreground));
+   }
 }
 
 /* 筛选输入框和单元格编辑框共用 VS Code 输入框样式。 */
@@ -180,7 +185,7 @@ button:focus-visible,
    overflow-wrap: anywhere;
 }
 
-/* 这里控制选中行。普通数据行的悬浮色来自 Tabulator 的 .tabulator-selectable:hover。 */
+/* 保留选中行的背景，悬浮时由上面的菜单高亮色覆盖。 */
 .tabulator .tabulator-row.selected-record {
    background: var(--vscode-list-inactiveSelectionBackground);
    color: var(--vscode-list-inactiveSelectionForeground, var(--vscode-editor-foreground));
