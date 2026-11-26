@@ -1,0 +1,20 @@
+{
+   "extension.description": "View and edit CSV and TSV files as tables in VS Code.",
+   "configuration.title": "CSV Table Editor",
+   "configuration.cellMaxCell.description": "Maximum width in pixels for automatically sized columns when a file is opened. Columns can still be resized manually. Reopen the file to apply changes.",
+   "configuration.tableHeader.description": "Use the first record as the table header. When disabled, the first record appears as a data row and columns use generated names such as Column 1. Changes apply immediately to open tables.",
+   "command.selectDelimiter": "CSV Table Editor: Select Delimiter",
+   "command.editCell": "Edit Cell",
+   "command.clearCell": "Clear Cell",
+   "command.clearFilter": "Clear Filter",
+   "command.resetAllFilters": "Reset All Filters",
+   "command.freezeCell": "Freeze Cell",
+   "command.unfreezeCell": "Unfreeze Cell",
+   "command.insertRowAbove": "Insert Row Above",
+   "command.insertRowBelow": "Insert Row Below",
+   "command.insertColumnLeft": "Insert Column Left",
+   "command.insertColumnRight": "Insert Column Right",
+   "command.deleteRow": "Delete Row",
+   "command.deleteColumn": "Delete Column",
+   "command.clearAndReloadTable": "Clear Cache and Reopen"
+}

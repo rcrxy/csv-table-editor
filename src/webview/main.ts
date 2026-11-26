@@ -42,7 +42,7 @@ const gutter = new GutterView(
    document.getElementById("overview")!,
    document.getElementById("end-markers")!,
    (row, line) => {
-      if (row === 0) {
+      if (row === snapshot?.header?.id) {
          tableElement.focus();
       } else if (row === null) {
          document.getElementById("end-markers")!.scrollIntoView({ block: "nearest" });
@@ -272,6 +272,10 @@ function hasViewOrder(): boolean {
    return table.getSorters().length > 0 || table.getHeaderFilters().length > 0;
 }
 
+function dataRecord(view: Snapshot, id: number | undefined) {
+   return id === undefined ? undefined : view.records[id - (view.tableHeader ? 1 : 0)];
+}
+
 // 行移动依赖源文件顺序，排序或筛选生效时暂停行移动。
 function moveSelection(vertical: boolean, direction: Direction): void {
    if (!snapshot) {
@@ -282,7 +286,7 @@ function moveSelection(vertical: boolean, direction: Direction): void {
       refreshControls();
    } else if (vertical && selectedRow !== undefined) {
       const next = selectedRow + direction;
-      if (next >= 1 && next <= snapshot.records.length && send({ kind: "moveRow", row: selectedRow, direction })) {
+      if (dataRecord(snapshot, next) && send({ kind: "moveRow", row: selectedRow, direction })) {
          selectRow(next);
          void table.scrollToRow(next, "nearest", false).catch(() => {});
       }
@@ -310,7 +314,7 @@ function send(operation: Operation): boolean {
 // 表头或冻结范围变化时才重建列。重建时沿用列宽，并重新应用仍存在的列的排序和筛选值。
 function applyColumns(next: Snapshot): void {
    const headers = Array.from({ length: next.columnCount }, (_, index) => next.header?.values[index] ?? "");
-   const key = JSON.stringify([headers, frozenCount]);
+   const key = JSON.stringify([next.tableHeader, headers, frozenCount]);
    if (key === renderedColumns) {
       return;
    }
@@ -323,7 +327,7 @@ function applyColumns(next: Snapshot): void {
    // 最左侧冻结列显示源文件行号和 Git 标记，业务列使用 c0、c1 等内部字段名。
    const stub: ColumnDefinition = {
       title: "#",
-      titleFormatter: () => gutter.header(),
+      titleFormatter: () => (next.header ? gutter.header() : asText("#")),
       field: "_line",
       frozen: true,
       width: 74,
@@ -333,7 +337,8 @@ function applyColumns(next: Snapshot): void {
       cssClass: "gutter-cell",
       formatter: (cell) => gutter.record({ id: Number(cell.getRow().getIndex()), line: Number(cell.getValue()) }),
    };
-   const columns: ColumnDefinition[] = headers.map((name, index) => {
+   // Tabulator 支持 maxInitialWidth，当前安装的类型声明尚未包含该属性。
+   const columns = headers.map<ColumnDefinition & { maxInitialWidth: number }>((name, index) => {
       const field = `c${index}`;
       return {
          title: `Column ${index + 1}`,
@@ -342,8 +347,9 @@ function applyColumns(next: Snapshot): void {
          sorter: "string",
          headerSortTristate: true,
          frozen: index < frozenCount,
-         width: widths.get(field) ?? 170,
-         minWidth: 80,
+         width: widths.get(field),
+         minWidth: Math.min(80, next.cellMaxWidth),
+         maxInitialWidth: next.cellMaxWidth,
          formatter: (cell) => asText(String(cell.getValue() ?? "")),
          cssClass: "data-cell",
          variableHeight: true,
@@ -382,7 +388,7 @@ async function render(next: Snapshot): Promise<void> {
       await table.replaceData([]);
       return;
    }
-   if (selectedRow !== undefined && selectedRow > next.records.length) {
+   if (selectedRow !== undefined && !dataRecord(next, selectedRow)) {
       selectedRow = undefined;
    }
    if (selectedColumn !== undefined && selectedColumn >= next.columnCount) {
@@ -420,7 +426,7 @@ function refreshControls(): void {
    const delimiter = snapshot.delimiter === "\t" ? "Tab" : snapshot.delimiter === " " ? "Space" : snapshot.delimiter;
    // delimiterButton.textContent = `Delimiter: ${delimiter}${snapshot.autoDelimiter ? " (auto)" : ""}`;
    statusElement.classList.toggle("error", !!snapshot.error);
-   const selected = selectedRow === undefined ? undefined : snapshot.records[selectedRow - 1];
+   const selected = dataRecord(snapshot, selectedRow);
    const summary = [
       `${snapshot.records.length} data rows · ${snapshot.columnCount} columns`,
       selected && `Line ${selected.line}`,

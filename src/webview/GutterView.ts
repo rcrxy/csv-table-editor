@@ -8,7 +8,7 @@ const statusNames: Record<GitStatus, string> = {
 };
 
 export class GutterView {
-   // 按当前快照的记录 ID 保存标记。0 是表头，null 是文件末尾的删除边界。
+   // 按当前快照的记录 ID 保存标记。0 是首条记录，null 是文件末尾的删除边界。
    private markers = new Map<number | null, GitMarker[]>();
 
    constructor(
@@ -62,7 +62,7 @@ export class GutterView {
       }
       // 更新新旧标记涉及的行，清除旧标记。尚未渲染的行会在格式化时读取当前标记。
       for (const id of new Set([...previous.keys(), ...this.markers.keys()])) {
-         if (id === 0 || id === null) {
+         if (id === null || (id === 0 && header)) {
             continue;
          }
          const row = this.table.getRow(id);

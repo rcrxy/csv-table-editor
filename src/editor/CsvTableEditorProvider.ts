@@ -31,6 +31,7 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
 class DocumentController {
    private readonly delimiterKey: string;
    private readonly fallback: string;
+   private readonly cellMaxWidth: number;
    private manualDelimiter: string | undefined;
    private autoDelimiter: string | undefined;
    private parsed: ParsedDocument | undefined;
@@ -48,6 +49,9 @@ class DocumentController {
    ) {
       this.delimiterKey = `delimiter:${document.uri.toString()}`;
       this.fallback = document.uri.path.toLowerCase().endsWith(".tsv") ? "\t" : ",";
+      const config = vscode.workspace.getConfiguration("csv-table-editor", document.uri);
+      const width = Math.floor(config.get<number>("cellMaxCell", 400));
+      this.cellMaxWidth = Number.isSafeInteger(width) && width > 0 ? width : 400;
       const saved = context.workspaceState.get<string>(this.delimiterKey);
       this.manualDelimiter = saved && !delimiterError(saved) ? saved : undefined;
       this.updateSnapshot();
@@ -70,6 +74,11 @@ class DocumentController {
          vscode.workspace.onDidSaveTextDocument((savedDocument) => {
             if (savedDocument === document) {
                this.git.schedule();
+            }
+         }),
+         vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration("csv-table-editor.tableHeader", document.uri)) {
+               this.sync(true);
             }
          }),
          panel.onDidDispose(() => {
@@ -131,14 +140,18 @@ class DocumentController {
          error = failure instanceof Error ? failure.message : "Could not parse the document.";
       }
       const records = this.parsed?.rows.map((row, id) => ({ id, line: row.startLine, values: row.values })) ?? [];
+      const config = vscode.workspace.getConfiguration("csv-table-editor", this.document.uri);
+      const tableHeader = config.get<boolean>("tableHeader", true) !== false;
       this.snapshot = {
          revision: (this.snapshot?.revision ?? 0) + 1,
          version: this.document.version,
          delimiter,
          autoDelimiter: this.manualDelimiter === undefined,
+         cellMaxWidth: this.cellMaxWidth,
+         tableHeader,
          columnCount: this.parsed?.columnCount ?? 0,
-         header: records[0],
-         records: records.slice(1),
+         header: tableHeader ? records[0] : undefined,
+         records: tableHeader ? records.slice(1) : records,
          error,
       };
    }
@@ -194,6 +207,9 @@ class DocumentController {
       }
       let editOperation: Exclude<Operation, { kind: "rename" }>;
       if (operation.kind === "rename") {
+         if (!this.snapshot.header) {
+            throw new Error("Enable the first record as a header to rename a column.");
+         }
          if (operation.column < 0 || operation.column >= parsed.columnCount) {
             throw new Error("Select a column first.");
          }
@@ -214,7 +230,7 @@ class DocumentController {
       if (editOperation.kind === "cell") {
          editOperation = { ...editOperation, value: editOperation.value.replace(/\r\n|\r|\n/g, parsed.newline) };
       }
-      const replacements = documentEdits(parsed, editOperation);
+      const replacements = documentEdits(parsed, editOperation, this.snapshot.tableHeader);
       if (!replacements.length) {
          return;
       }

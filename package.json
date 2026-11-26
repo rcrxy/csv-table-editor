@@ -3,7 +3,7 @@
     "displayName": "CSV Table Editor",
     "author": "zeco",
     "publisher": "zeco",
-    "description": "View and edit CSV and TSV files as tables in VS Code.",
+    "description": "%extension.description%",
     "version": "0.0.1",
     "engines": {
         "vscode": "^1.146.0"
@@ -27,70 +27,70 @@
         "commands": [
             {
                 "command": "csv-table-editor.selectDelimiter",
-                "title": "CSV Table Editor: Select Delimiter"
+                "title": "%command.selectDelimiter%"
             },
             {
-                "title": "编辑单元格",
+                "title": "%command.editCell%",
                 "command": "csv-table-editor.editCell",
                 "enablement": "true"
             },
             {
-                "title": "清空单元格",
+                "title": "%command.clearCell%",
                 "command": "csv-table-editor.clearCell",
                 "enablement": "true"
             },
             {
-                "title": "清空筛选",
+                "title": "%command.clearFilter%",
                 "command": "csv-table-editor.clearFilter",
                 "enablement": "true"
             },
             {
-                "title": "重置所有筛选",
+                "title": "%command.resetAllFilters%",
                 "command": "csv-table-editor.resetAllFilters",
                 "enablement": "true"
             },
             {
-                "title": "冻结单元格",
+                "title": "%command.freezeCell%",
                 "command": "csv-table-editor.freezeCell",
                 "enablement": "true"
             },
             {
-                "title": "解冻单元格",
+                "title": "%command.unfreezeCell%",
                 "command": "csv-table-editor.unfreezeCell",
                 "enablement": "true"
             },
             {
-                "title": "在上方添加一行",
+                "title": "%command.insertRowAbove%",
                 "command": "csv-table-editor.insertRowAbove",
                 "enablement": "true"
             },
             {
-                "title": "在下方添加一行",
+                "title": "%command.insertRowBelow%",
                 "command": "csv-table-editor.insertRowBelow",
                 "enablement": "true"
             },
             {
-                "title": "在左侧添加一列",
+                "title": "%command.insertColumnLeft%",
                 "command": "csv-table-editor.insertColumnLeft",
                 "enablement": "true"
             },
             {
-                "title": "在右侧添加一列",
+                "title": "%command.insertColumnRight%",
                 "command": "csv-table-editor.insertColumnRight",
                 "enablement": "true"
             },
             {
-                "title": "删除当前行",
+                "title": "%command.deleteRow%",
                 "command": "csv-table-editor.deleteRow",
                 "enablement": "true"
             },
             {
-                "title": "删除当前列",
+                "title": "%command.deleteColumn%",
                 "command": "csv-table-editor.deleteColumn",
                 "enablement": "true"
             },
             {
-                "title": "清空缓存并重新打开",
+                "title": "%command.clearAndReloadTable%",
                 "command": "csv-table-editor.clearAndReloadTable",
                 "enablement": "true"
             }
@@ -179,20 +179,21 @@
                 }
             ]
         },
-        "configuration":{
-            "title": "CSV 表格编辑器",
+        "configuration": {
+            "title": "%configuration.title%",
             "properties": {
                 "csv-table-editor.cellMaxCell": {
-                    "type":"number",
+                    "type": "number",
                     "default": 400,
+                    "minimum": 1,
                     "order": 1,
-                    "description": "首次打开时，单元格的最大宽度"
+                    "description": "%configuration.cellMaxCell.description%"
                 },
                 "csv-table-editor.tableHeader": {
                     "type": "boolean",
                     "default": true,
                     "order": 2,
-                    "description": "设置第一行为表头"
+                    "description": "%configuration.tableHeader.description%"
                 }
             }
         }

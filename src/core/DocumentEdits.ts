@@ -17,42 +17,49 @@ export function encodeField(value: string, delimiter: string, quoted = false): s
 export function documentEdits(
    document: ParsedDocument,
    operation: Exclude<Operation, { kind: "rename" }>,
+   tableHeader: boolean,
 ): TextReplacement[] {
    const { rows, delimiter, newline, text, columnCount, bomLength } = document;
+   const firstDataRow = tableHeader ? 1 : 0;
    const last = rows.at(-1);
    if (operation.kind === "addRow") {
       if (!last) {
-         return [{ start: bomLength, end: bomLength, text: `${encodeField("Column 1", delimiter)}${newline}""` }];
+         const row = tableHeader ? `${encodeField("Column 1", delimiter)}${newline}""` : '""';
+         return [{ start: bomLength, end: bomLength, text: row }];
       }
       const blank = columnCount === 1 && !last.eol ? '""' : delimiter.repeat(columnCount - 1);
       const insertion = last.eol ? blank + last.eol : newline + blank;
       return [{ start: text.length, end: text.length, text: insertion }];
    }
    if (operation.kind === "addColumn" && !last) {
-      return [{ start: bomLength, end: bomLength, text: encodeField("Column 1", delimiter) }];
+      return [{ start: bomLength, end: bomLength, text: tableHeader ? encodeField("Column 1", delimiter) : '""' }];
    }
 
    if ("row" in operation) {
       const index = operation.row;
       const row = rows[index];
-      if (!Number.isInteger(index) || !row || (index === 0 && operation.kind !== "cell")) {
+      if (!Number.isInteger(index) || !row || (index < firstDataRow && operation.kind !== "cell")) {
          throw new Error("Select a data record first.");
       }
       if (operation.kind === "deleteRow") {
          const previous = rows[index - 1];
-         const start = !row.eol && previous.start !== previous.end ? previous.end : row.start;
+         const start = !row.eol && previous && previous.start !== previous.end ? previous.end : row.start;
          return [{ start, end: row.end + row.eol.length, text: "" }];
       }
       if (operation.kind === "moveRow") {
          const destination = index + operation.direction;
          const other = rows[destination];
-         if (!other || destination === 0) {
+         if (!other || destination < firstDataRow) {
             return [];
          }
          const first = index < destination ? row : other;
          const second = index < destination ? other : row;
          const firstText = text.slice(first.start, first.end);
-         const secondText = text.slice(second.start, second.end);
+         let secondText = text.slice(second.start, second.end);
+         if (first === rows[0] && secondText.startsWith("\uFEFF")) {
+            const field = second.fields[0];
+            secondText = encodeField(text.slice(field.start, field.end), delimiter) + text.slice(field.end, second.end);
+         }
          return [
             {
                start: first.start,
@@ -95,7 +102,7 @@ export function documentEdits(
       const fields = row.fields;
       if (operation.kind === "addColumn") {
          const padding = delimiter.repeat(column - fields.length + 1);
-         const name = index === 0 ? encodeField(`Column ${column + 1}`, delimiter) : "";
+         const name = tableHeader && index === 0 ? encodeField(`Column ${column + 1}`, delimiter) : "";
          edits.push({ start: row.end, end: row.end, text: padding + name });
          return;
       }

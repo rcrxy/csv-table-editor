@@ -26,6 +26,8 @@ export interface Snapshot {
    version: number;
    delimiter: string;
    autoDelimiter: boolean;
+   cellMaxWidth: number;
+   tableHeader: boolean;
    columnCount: number;
    header: TableRecord | undefined;
    records: TableRecord[];
