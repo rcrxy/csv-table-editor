@@ -28,8 +28,146 @@
             {
                 "command": "csv-table-editor.selectDelimiter",
                 "title": "CSV Table Editor: Select Delimiter"
+            },
+            {
+                "title": "编辑单元格",
+                "command": "csv-table-editor.editCell",
+                "enablement": "true"
+            },
+            {
+                "title": "清空单元格",
+                "command": "csv-table-editor.clearCell",
+                "enablement": "true"
+            },
+            {
+                "title": "清空筛选",
+                "command": "csv-table-editor.clearFilter",
+                "enablement": "true"
+            },
+            {
+                "title": "重置所有筛选",
+                "command": "csv-table-editor.resetAllFilters",
+                "enablement": "true"
+            },
+            {
+                "title": "冻结单元格",
+                "command": "csv-table-editor.freezeCell",
+                "enablement": "true"
+            },
+            {
+                "title": "解冻单元格",
+                "command": "csv-table-editor.unfreezeCell",
+                "enablement": "true"
+            },
+            {
+                "title": "在上方添加一行",
+                "command": "csv-table-editor.insertRowAbove",
+                "enablement": "true"
+            },
+            {
+                "title": "在下方添加一行",
+                "command": "csv-table-editor.insertRowBelow",
+                "enablement": "true"
+            },
+            {
+                "title": "在左侧添加一列",
+                "command": "csv-table-editor.insertColumnLeft",
+                "enablement": "true"
+            },
+            {
+                "title": "在右侧添加一列",
+                "command": "csv-table-editor.insertColumnRight",
+                "enablement": "true"
+            },
+            {
+                "title": "删除当前行",
+                "command": "csv-table-editor.deleteRow",
+                "enablement": "true"
+            },
+            {
+                "title": "删除当前列",
+                "command": "csv-table-editor.deleteColumn",
+                "enablement": "true"
             }
-        ]
+        ],
+        "menus": {
+            "commandPalette": [
+                { "command": "csv-table-editor.editCell", "when": "false" },
+                { "command": "csv-table-editor.clearCell", "when": "false" },
+                { "command": "csv-table-editor.clearFilter", "when": "false" },
+                { "command": "csv-table-editor.resetAllFilters", "when": "false" },
+                { "command": "csv-table-editor.freezeCell", "when": "false" },
+                { "command": "csv-table-editor.unfreezeCell", "when": "false" },
+                { "command": "csv-table-editor.insertRowAbove", "when": "false" },
+                { "command": "csv-table-editor.insertRowBelow", "when": "false" },
+                { "command": "csv-table-editor.insertColumnLeft", "when": "false" },
+                { "command": "csv-table-editor.insertColumnRight", "when": "false" },
+                { "command": "csv-table-editor.deleteRow", "when": "false" },
+                { "command": "csv-table-editor.deleteColumn", "when": "false" }
+            ],
+            "webview/context": [
+                {
+                    "command": "csv-table-editor.editCell",
+                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell'",
+                    "group": "1_cell@1"
+                },
+                {
+                    "command": "csv-table-editor.clearCell",
+                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell'",
+                    "group": "1_cell@2"
+                },
+                {
+                    "command": "csv-table-editor.clearFilter",
+                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'header')",
+                    "group": "2_filter@1"
+                },
+                {
+                    "command": "csv-table-editor.resetAllFilters",
+                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'header'",
+                    "group": "2_filter@2"
+                },
+                {
+                    "command": "csv-table-editor.freezeCell",
+                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell'",
+                    "group": "3_freeze@1"
+                },
+                {
+                    "command": "csv-table-editor.unfreezeCell",
+                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell' && hasFrozenColumns",
+                    "group": "3_freeze@2"
+                },
+                {
+                    "command": "csv-table-editor.insertRowAbove",
+                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'row')",
+                    "group": "4_row@1"
+                },
+                {
+                    "command": "csv-table-editor.insertRowBelow",
+                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'row')",
+                    "group": "4_row@2"
+                },
+                {
+                    "command": "csv-table-editor.insertColumnLeft",
+                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'header')",
+                    "group": "5_column@1"
+                },
+                {
+                    "command": "csv-table-editor.insertColumnRight",
+                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'header')",
+                    "group": "5_column@2"
+                },
+                {
+                    "command": "csv-table-editor.deleteRow",
+                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'row')",
+                    "group": "6_delete@1"
+                },
+                {
+                    "command": "csv-table-editor.deleteColumn",
+                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'header')",
+                    "group": "6_delete@2"
+                }
+            ]
+        }
     },
     "scripts": {
         "vscode:prepublish": "npm run package",

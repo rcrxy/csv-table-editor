@@ -103,6 +103,46 @@ table.on("cellEdited", (cell) => {
    refreshControls();
 });
 
+type MenuTarget =
+   | { webviewSection: "row"; rowId: number }
+   | { webviewSection: "cell"; rowId: number; field: string }
+   | { webviewSection: "header"; field: string };
+
+function setMenuTarget(element: HTMLElement, target: MenuTarget): void {
+   element.dataset.vscodeContext = JSON.stringify({
+      ...target,
+      revision: snapshot?.revision,
+      version: snapshot?.version,
+      hasFrozenColumns: frozenCount > 0,
+   });
+}
+
+table.on("rowContext", (_event, row) => {
+   setMenuTarget(row.getElement(), {
+      webviewSection: "row",
+      rowId: Number(row.getIndex()),
+   });
+});
+
+table.on("cellContext", (_event, cell) => {
+   const field = cell.getField();
+   if (columnIndex(field) === undefined) {
+      return; // 左侧行号列沿用行菜单。
+   }
+   setMenuTarget(cell.getElement(), {
+      webviewSection: "cell",
+      rowId: Number(cell.getRow().getIndex()),
+      field,
+   });
+});
+
+table.on("headerContext", (_event, column) => {
+   const field = column.getField();
+   if (columnIndex(field) !== undefined) {
+      setMenuTarget(column.getElement(), { webviewSection: "header", field });
+   }
+});
+
 // 快照渲染可能异步完成，按消息顺序处理，并丢弃不属于当前快照的 Git 标记。
 window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
    if (!data || typeof data !== "object") {
