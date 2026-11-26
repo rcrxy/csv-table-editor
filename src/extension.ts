@@ -2,6 +2,15 @@ import * as vscode from "vscode";
 import { CsvTableEditorProvider, viewType } from "./editor/CsvTableEditorProvider";
 import type { TableDirection } from "./shared/messages";
 
+const structureMenuCommands = [
+   "insertRowAbove",
+   "insertRowBelow",
+   "insertColumnLeft",
+   "insertColumnRight",
+   "deleteRow",
+   "deleteColumn",
+] as const;
+
 export function activate(context: vscode.ExtensionContext): void {
    const provider = new CsvTableEditorProvider(context);
    context.subscriptions.push(
@@ -14,11 +23,10 @@ export function activate(context: vscode.ExtensionContext): void {
          provider.toggleTextWrapping(resource),
       ),
       vscode.commands.registerCommand("csv-table-editor.editCell", (context?: unknown) => provider.editCell(context)),
-      vscode.commands.registerCommand("csv-table-editor.deleteRow", (context: unknown) =>
-         provider.deleteFromMenu("deleteRow", context),
-      ),
-      vscode.commands.registerCommand("csv-table-editor.deleteColumn", (context: unknown) =>
-         provider.deleteFromMenu("deleteColumn", context),
+      ...structureMenuCommands.map((command) =>
+         vscode.commands.registerCommand(`csv-table-editor.${command}`, (context: unknown) =>
+            provider.editStructureFromMenu(command, context),
+         ),
       ),
       vscode.commands.registerCommand("csv-table-editor.moveCellSelection", (direction: unknown) => {
          if (isTableDirection(direction)) {

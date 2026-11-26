@@ -23,16 +23,23 @@ export function documentEdits(
    const firstDataRow = tableHeader ? 1 : 0;
    const last = rows.at(-1);
    if (operation.kind === "addRow") {
+      const index = operation.before ?? rows.length;
+      if (!Number.isInteger(index) || index < Math.min(firstDataRow, rows.length) || index > rows.length) {
+         throw new Error("Select a data record first.");
+      }
       if (!last) {
          const row = tableHeader ? `${encodeField("Column 1", delimiter)}${newline}""` : '""';
          return [{ start: bomLength, end: bomLength, text: row }];
       }
+      const following = rows[index];
+      if (following) {
+         // 为单列空记录加引号，避免混用换行符时相邻的换行合并。
+         const blank = columnCount === 1 ? '""' : delimiter.repeat(columnCount - 1);
+         return [{ start: following.start, end: following.start, text: blank + (following.eol || newline) }];
+      }
       const blank = columnCount === 1 && !last.eol ? '""' : delimiter.repeat(columnCount - 1);
       const insertion = last.eol ? blank + last.eol : newline + blank;
       return [{ start: text.length, end: text.length, text: insertion }];
-   }
-   if (operation.kind === "addColumn" && !last) {
-      return [{ start: bomLength, end: bomLength, text: tableHeader ? encodeField("Column 1", delimiter) : '""' }];
    }
 
    if ("row" in operation) {
@@ -91,9 +98,14 @@ export function documentEdits(
       return [{ start: field.start, end: field.quoteEnd ?? field.end, text: encodeField(value, delimiter, quoted) }];
    }
 
-   const column = operation.kind === "addColumn" ? columnCount : operation.column;
-   if (operation.kind !== "addColumn" && (!Number.isInteger(column) || column < 0 || column >= columnCount)) {
+   const addingColumn = operation.kind === "addColumn";
+   const column = addingColumn ? (operation.before ?? columnCount) : operation.column;
+   const lastColumn = addingColumn ? columnCount : columnCount - 1;
+   if (!Number.isInteger(column) || column < 0 || column > lastColumn) {
       throw new Error("Select a column first.");
+   }
+   if (addingColumn && !last) {
+      return [{ start: bomLength, end: bomLength, text: tableHeader ? encodeField("Column 1", delimiter) : '""' }];
    }
    if (operation.kind === "deleteColumn" && columnCount === 1) {
       throw new Error("The table must keep at least one column.");
@@ -106,10 +118,15 @@ export function documentEdits(
    const edits: TextReplacement[] = [];
    rows.forEach((row, index) => {
       const fields = row.fields;
-      if (operation.kind === "addColumn") {
-         const padding = delimiter.repeat(column - fields.length + 1);
-         const name = tableHeader && index === 0 ? encodeField(`Column ${column + 1}`, delimiter) : "";
-         edits.push({ start: row.end, end: row.end, text: padding + name });
+      if (addingColumn) {
+         const name = tableHeader && index === 0 ? encodeField(`Column ${columnCount + 1}`, delimiter) : "";
+         const following = fields[column];
+         if (following) {
+            edits.push({ start: following.start, end: following.start, text: name + delimiter });
+         } else {
+            const padding = delimiter.repeat(column - fields.length + 1);
+            edits.push({ start: row.end, end: row.end, text: padding + name });
+         }
          return;
       }
       if (operation.kind === "deleteColumn") {

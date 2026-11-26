@@ -3,12 +3,12 @@ import "tabulator-tables/dist/css/tabulator.min.css";
 import "./styles.css";
 import markup from "./body.html";
 import type {
-   DeleteKind,
    Direction,
    HostMessage,
    KeyboardMode,
    Operation,
    Snapshot,
+   StructureMenuCommand,
    TableAction,
    WebviewMessage,
 } from "../shared/messages";
@@ -191,29 +191,44 @@ type MenuTarget =
    | { webviewSection: "cell"; rowId: number; field: string }
    | { webviewSection: "header"; field: string };
 
-// 显示菜单和执行删除共用同一套定位规则。第一行以排序和筛选后的视图为准。
-function menuDeleteOperation(
-   kind: DeleteKind,
+// 菜单定位使用源记录 ID。无表头时，删除列的入口取排序和筛选后的第一行。
+function menuStructureOperation(
+   command: StructureMenuCommand,
    field: string | undefined,
    rowId: number | undefined,
-): Extract<Operation, { kind: DeleteKind }> | undefined {
-   if (!snapshot || snapshot.error || field === undefined) {
+): Operation | undefined {
+   if (!snapshot || snapshot.error) {
       return;
    }
-   const column = columnIndex(field);
-   if (kind === "deleteRow") {
-      const rowControls = snapshot.showRowNumbers ? field === "_line" : column === 0;
-      if (rowControls && rowId !== undefined && dataRecord(snapshot, rowId)) {
-         return { kind, row: rowId };
+   if (command === "insertRowAbove" || command === "insertRowBelow") {
+      if (rowId !== undefined && dataRecord(snapshot, rowId)) {
+         return { kind: "addRow", before: command === "insertRowAbove" ? rowId : rowId + 1 };
       }
       return;
    }
-   if (column === undefined || column >= snapshot.columnCount || snapshot.columnCount < 2) {
+   if (field === undefined) {
+      return;
+   }
+   const column = columnIndex(field);
+   if (command === "deleteRow") {
+      const rowControls = snapshot.showRowNumbers ? field === "_line" : column === 0;
+      if (rowControls && rowId !== undefined && dataRecord(snapshot, rowId)) {
+         return { kind: "deleteRow", row: rowId };
+      }
+      return;
+   }
+   if (column === undefined || column >= snapshot.columnCount) {
+      return;
+   }
+   if (command === "insertColumnLeft" || command === "insertColumnRight") {
+      return { kind: "addColumn", before: command === "insertColumnLeft" ? column : column + 1 };
+   }
+   if (snapshot.columnCount < 2) {
       return;
    }
    const row = rowId !== undefined && !snapshot.tableHeader && table.getRow(rowId);
    if ((rowId === undefined && snapshot.header) || (row && row.getPosition() === 1)) {
-      return { kind, column };
+      return { kind: "deleteColumn", column };
    }
 }
 
@@ -226,8 +241,8 @@ function setMenuTarget(element: HTMLElement, target: MenuTarget): void {
       version: snapshot?.version,
       tableResource: snapshot?.resource,
       hasFrozenColumns: frozenCount > 0,
-      canDeleteTableRow: !!menuDeleteOperation("deleteRow", field, rowId),
-      canDeleteTableColumn: !!menuDeleteOperation("deleteColumn", field, rowId),
+      canDeleteTableRow: !!menuStructureOperation("deleteRow", field, rowId),
+      canDeleteTableColumn: !!menuStructureOperation("deleteColumn", field, rowId),
    });
 }
 
@@ -364,10 +379,10 @@ function runTableAction(action: TableAction): void {
    if (composing) {
       return;
    }
-   if (action.kind === "deleteFromMenu") {
+   if (action.kind === "editStructureFromMenu") {
       const { field, rowId, revision, version } = action.target;
       if (snapshot?.revision === revision && snapshot.version === version) {
-         send(menuDeleteOperation(action.deleteKind, field, rowId));
+         send(menuStructureOperation(action.command, field, rowId));
       }
       return;
    }

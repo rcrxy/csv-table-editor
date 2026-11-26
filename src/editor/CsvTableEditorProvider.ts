@@ -2,7 +2,15 @@ import * as vscode from "vscode";
 import { delimiters, delimiterError, detectDelimiter, parseDocument, type ParsedDocument } from "../core/CsvParser";
 import { documentEdits } from "../core/DocumentEdits";
 import { GitGutter } from "../git/GitGutter";
-import type { DeleteKind, HostMessage, KeyboardMode, Operation, Snapshot, TableAction, WebviewMessage } from "../shared/messages";
+import type {
+   HostMessage,
+   KeyboardMode,
+   Operation,
+   Snapshot,
+   StructureMenuCommand,
+   TableAction,
+   WebviewMessage,
+} from "../shared/messages";
 import { configureWebview } from "./webview";
 
 export const viewType = "csv-table-editor.table";
@@ -65,7 +73,7 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
       }
    }
 
-   deleteFromMenu(kind: DeleteKind, context: unknown): void {
+   editStructureFromMenu(command: StructureMenuCommand, context: unknown): void {
       const session = this.activeSession();
       if (
          !session ||
@@ -75,17 +83,20 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
       ) {
          return;
       }
-      const allowed = kind === "deleteRow" ? context.canDeleteTableRow : context.canDeleteTableColumn;
+      if (
+         (command === "deleteRow" && context.canDeleteTableRow !== true) ||
+         (command === "deleteColumn" && context.canDeleteTableColumn !== true)
+      ) {
+         return;
+      }
       const { field, rowId, revision, version } = context;
       if (
-         allowed === true &&
-         typeof field === "string" &&
-         /^(_line|c\d+)$/.test(field) &&
+         (field === undefined || (typeof field === "string" && /^(_line|c\d+)$/.test(field))) &&
          (rowId === undefined || (typeof rowId === "number" && Number.isSafeInteger(rowId))) &&
          typeof revision === "number" &&
          typeof version === "number"
       ) {
-         session.runTableAction({ kind: "deleteFromMenu", deleteKind: kind, target: { field, rowId, revision, version } });
+         session.runTableAction({ kind: "editStructureFromMenu", command, target: { field, rowId, revision, version } });
       }
    }
 
@@ -488,7 +499,10 @@ function isOperation(value: unknown): value is Operation {
          return hasColumn && hasDirection;
       case "addRow":
       case "addColumn":
-         return true;
+         return (
+            value.before === undefined ||
+            (typeof value.before === "number" && Number.isSafeInteger(value.before) && value.before >= 0)
+         );
       default:
          return false;
    }

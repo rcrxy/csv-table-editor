@@ -2,21 +2,31 @@ export type Direction = -1 | 1;
 
 export type TableDirection = "up" | "down" | "left" | "right";
 export type KeyboardMode = "inactive" | "grid" | "editing";
-export type DeleteKind = "deleteRow" | "deleteColumn";
+export type StructureMenuCommand =
+   | "insertRowAbove"
+   | "insertRowBelow"
+   | "insertColumnLeft"
+   | "insertColumnRight"
+   | "deleteRow"
+   | "deleteColumn";
 
 export type TableAction =
    | { kind: "moveCellSelection" | "moveTableStructure"; direction: TableDirection }
    | { kind: "editCell"; target?: { row: number; column: number; revision: number; version: number } }
-   | { kind: "deleteFromMenu"; deleteKind: DeleteKind; target: { field: string; rowId?: number; revision: number; version: number } }
+   | {
+        kind: "editStructureFromMenu";
+        command: StructureMenuCommand;
+        target: { field?: string; rowId?: number; revision: number; version: number };
+     }
    | { kind: "submitCellEdit"; save: boolean };
 
 export type Operation =
    | { kind: "cell"; row: number; column: number; value: string }
    | { kind: "rename"; column: number }
-   | { kind: "addRow" }
+   | { kind: "addRow"; before?: number }
    | { kind: "deleteRow"; row: number }
    | { kind: "moveRow"; row: number; direction: Direction }
-   | { kind: "addColumn" }
+   | { kind: "addColumn"; before?: number }
    | { kind: "deleteColumn"; column: number }
    | { kind: "moveColumn"; column: number; direction: Direction };
 
