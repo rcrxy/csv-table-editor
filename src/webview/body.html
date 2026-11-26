@@ -3,8 +3,8 @@
 <main id="workspace">
    <!-- Tabulator 挂载点。tabindex 让表格可以接收行列移动快捷键。 -->
    <div id="table" tabindex="0" aria-label="CSV table"></div>
-   <!-- GutterView 按文件中的物理行位置绘制右侧 Git 概览。 -->
-   <div id="overview" role="group" aria-label="Git changes in file" hidden></div>
 </main>
+<!-- 表格初始化后，GutterView 将 Git 标记放到纵向滚动条上。 -->
+<div id="overview" role="group" aria-label="Git changes in file" hidden></div>
 <!-- 文件末尾的删除没有对应的表格行，由独立区域显示。 -->
 <div id="end-markers" hidden></div>

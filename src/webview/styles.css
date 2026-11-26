@@ -1,4 +1,4 @@
-/* VS Code 主题变量。左右两侧的 Git 标记共用这组颜色。 */
+/* VS Code 主题变量。滚动条标记优先使用文本编辑器的概览尺颜色。 */
 :root {
    color-scheme: light dark;
    --table-line: var(--vscode-panel-border, transparent);
@@ -78,7 +78,7 @@ button:focus-visible,
    color: var(--vscode-errorForeground);
 }
 
-/* 表格和右侧概览尺并排，允许表格在窄窗口内自行滚动。 */
+/* 表格在窄窗口内自行滚动。 */
 #workspace {
    display: flex;
    flex: 1;
@@ -257,41 +257,91 @@ button:focus-visible,
    width: 9px;
 }
 
-/* 右侧 Git 概览尺的标记位置由 GutterView 按源文件行号计算。 */
-#overview {
-   position: relative;
-   flex: 0 0 15px;
-   border-left: 1px solid var(--table-line);
+/* Git 标记与原生纵向滚动条共用轨道。 */
+.tabulator .tabulator-tableholder {
+   scrollbar-gutter: stable;
+   scrollbar-color: auto;
+}
+
+/* 短表的滚动留白在表格数据之外，避免影响 Tabulator 的行高度计算。 */
+.tabulator .tabulator-tableholder::after {
+   content: "";
+   position: absolute;
+   top: var(--table-scroll-end, 0px);
+   left: 0;
+   width: 1px;
+   height: 1px;
+   pointer-events: none;
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar:vertical {
+   width: 14px;
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-button:vertical {
+   display: none;
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-track:vertical {
    background: var(--vscode-editorOverviewRuler-background, var(--vscode-editor-background));
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-thumb:vertical {
+   background: var(--vscode-scrollbarSlider-background, #7f7f7f66);
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-thumb:vertical:hover {
+   background: var(--vscode-scrollbarSlider-hoverBackground, #7f7f7f99);
+}
+
+.tabulator .tabulator-tableholder::-webkit-scrollbar-thumb:vertical:active {
+   background: var(--vscode-scrollbarSlider-activeBackground, #7f7f7fbf);
+}
+
+#overview {
+   position: absolute;
+   z-index: 2;
+   overflow: hidden;
+   pointer-events: none;
 }
 
 .overview-marker {
    position: absolute;
    left: 1px;
-   width: 7px;
-   height: 4px;
+   width: 5px;
+   height: 3px;
    padding: 0;
    border: 0;
    transform: translateY(-50%);
    cursor: pointer;
+   pointer-events: auto;
 }
 
 .overview-marker.deleted {
-   left: 8px;
-   width: 6px;
+   left: 6px;
+   width: 3px;
 }
 
-.gutter-strip.added,
-.overview-marker.added {
+.gutter-strip.added {
    background: var(--git-added);
 }
 
-.gutter-strip.modified,
-.overview-marker.modified {
+.gutter-strip.modified {
    background: var(--git-modified);
 }
 
-.gutter-strip.deleted,
-.overview-marker.deleted {
+.gutter-strip.deleted {
    background: var(--git-deleted);
+}
+
+.overview-marker.added {
+   background: var(--vscode-editorOverviewRuler-addedForeground, var(--git-added));
+}
+
+.overview-marker.modified {
+   background: var(--vscode-editorOverviewRuler-modifiedForeground, var(--git-modified));
+}
+
+.overview-marker.deleted {
+   background: var(--vscode-editorOverviewRuler-deletedForeground, var(--git-deleted));
 }

@@ -7,9 +7,19 @@ const statusNames: Record<GitStatus, string> = {
    deleted: "Deletion at this boundary",
 };
 
+interface RenderedRowPosition {
+   index: number;
+   top: number;
+   bottom: number;
+}
+
 export class GutterView {
    // 按当前快照的记录 ID 保存标记。0 是首条记录，null 是文件末尾的删除边界。
    private markers = new Map<number | null, GitMarker[]>();
+   private overviewMarkers: { row: number | null; button: HTMLButtonElement }[] = [];
+   private displayPositions = new Map<number, number>();
+   private headerRecord: number | undefined;
+   private scheduleScrollTrack: (() => void) | undefined;
 
    constructor(
       private readonly table: TabulatorFull,
@@ -18,6 +28,99 @@ export class GutterView {
       private readonly end: HTMLElement,
       private readonly reveal: (row: number | null, line: number) => void,
    ) {}
+
+   attachScrollTrack(): void {
+      const viewport = this.tableElement.querySelector<HTMLElement>(".tabulator-tableholder");
+      const content = viewport?.querySelector<HTMLElement>(".tabulator-table");
+      if (!viewport || !content) {
+         return;
+      }
+      this.tableElement.append(this.overview);
+      let frame: number | undefined;
+      const schedule = () => {
+         if (frame === undefined) {
+            frame = requestAnimationFrame(() => {
+               frame = undefined;
+               this.layoutScrollTrack(viewport, content);
+            });
+         }
+      };
+      this.scheduleScrollTrack = schedule;
+      const updateDisplayPositions = () => {
+         this.displayPositions.clear();
+         this.table.getRows("active").forEach((row, index) => {
+            this.displayPositions.set(Number(row.getIndex()), index);
+         });
+         schedule();
+      };
+      this.table.on("renderComplete", updateDisplayPositions);
+      this.table.on("scrollVertical", schedule);
+      const observer = new ResizeObserver(schedule);
+      observer.observe(viewport);
+      observer.observe(content);
+      updateDisplayPositions();
+   }
+
+   private layoutScrollTrack(viewport: HTMLElement, content: HTMLElement): void {
+      const trackHeight = viewport.clientHeight;
+      const contentHeight = content.offsetHeight;
+      const positions = new Map<number, RenderedRowPosition>();
+      for (const element of content.children) {
+         if (!(element instanceof HTMLElement) || element.dataset.recordId === undefined) {
+            continue;
+         }
+         const id = Number(element.dataset.recordId);
+         const index = this.displayPositions.get(id);
+         if (index !== undefined) {
+            const top = element.offsetTop;
+            positions.set(id, { index, top, bottom: top + element.offsetHeight });
+         }
+      }
+      const rendered = [...positions.values()];
+      const first = rendered[0];
+      const last = rendered.at(-1);
+      // 短表在底部多留一行滚动空间，计算标记时仍以可见轨道高度为基准。
+      if (first && contentHeight <= trackHeight) {
+         viewport.style.setProperty("--table-scroll-end", `${trackHeight + first.bottom - first.top}px`);
+      } else {
+         viewport.style.removeProperty("--table-scroll-end");
+      }
+      // clientHeight 不包含横向滚动条。
+      this.overview.style.top = `${viewport.offsetTop}px`;
+      this.overview.style.left = `${viewport.offsetLeft + viewport.clientWidth}px`;
+      this.overview.style.width = `${viewport.offsetWidth - viewport.clientWidth}px`;
+      this.overview.style.height = `${trackHeight}px`;
+
+      const rowCount = this.displayPositions.size;
+      const scaleHeight = Math.max(1, trackHeight, contentHeight);
+      for (const { row, button } of this.overviewMarkers) {
+         let offset = 0;
+         if (row === null) {
+            offset = contentHeight;
+         } else if (row !== this.headerRecord) {
+            const index = this.displayPositions.get(row);
+            if (index === undefined) {
+               button.hidden = true;
+               continue;
+            }
+            const position = positions.get(row);
+            // 虚拟列表只渲染部分记录，用已知行的边界估算其余记录的位置。
+            if (position) {
+               offset = (position.top + position.bottom) / 2;
+            } else if (first && index < first.index) {
+               offset = ((index + 0.5) / first.index) * first.top;
+            } else if (last && index > last.index) {
+               const afterLast = rowCount - last.index - 1;
+               offset = last.bottom + ((index - last.index - 0.5) / afterLast) * (contentHeight - last.bottom);
+            } else {
+               offset = ((index + 0.5) / rowCount) * contentHeight;
+            }
+         }
+         button.hidden = false;
+         const top = (offset / scaleHeight) * trackHeight;
+         button.style.top = `${Math.min(Math.max(top, 1.5), Math.max(1.5, trackHeight - 1.5))}px`;
+      }
+   }
 
    measureWidth(digits: number): number {
       const sample = document.createElement("span");
@@ -47,11 +150,12 @@ export class GutterView {
       return element;
    }
 
-   update(gutter: Gutter | undefined): void {
+   update(gutter: Gutter | undefined, headerRecord?: number): void {
       const previous = this.markers;
       this.markers = new Map();
+      this.headerRecord = headerRecord;
+      this.overviewMarkers = [];
       const overview = document.createDocumentFragment();
-      const lineCount = Math.max(1, gutter?.lineCount ?? 1);
       for (const marker of gutter?.markers ?? []) {
          const list = this.markers.get(marker.row) ?? [];
          list.push(marker);
@@ -62,13 +166,13 @@ export class GutterView {
          button.type = "button";
          button.title = `${statusNames[marker.status]} · line ${marker.line}`;
          button.setAttribute("aria-label", button.title);
-         // 概览尺使用源文件行号，位置与表格当前的排序和筛选无关。
-         button.style.top = `${((marker.line - 0.5) / lineCount) * 100}%`;
          button.addEventListener("click", () => this.reveal(marker.row, marker.line));
+         this.overviewMarkers.push({ row: marker.row, button });
          overview.append(button);
       }
       this.overview.replaceChildren(overview);
       this.overview.hidden = this.markers.size === 0;
+      this.scheduleScrollTrack?.();
 
       const header = this.tableElement.querySelector<HTMLElement>(".header-gutter");
       if (header) {

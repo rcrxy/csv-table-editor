@@ -52,9 +52,14 @@ const table = new Tabulator(tableElement, {
    editTriggerEvent: "dblclick",
    keybindings: { navUp: false, navDown: false, navLeft: false, navRight: false },
    placeholder: "No data records",
-   rowFormatter: (row) => row.getElement().classList.toggle("selected-record", Number(row.getIndex()) === selectedRow),
+   rowFormatter: (row) => {
+      const element = row.getElement();
+      const id = Number(row.getIndex());
+      element.dataset.recordId = String(id);
+      element.classList.toggle("selected-record", id === selectedRow);
+   },
 });
-// 从概览尺定位到记录。表头和文件末尾没有对应的数据行。
+// 从滚动条上的 Git 标记定位到记录。表头和文件末尾没有对应的数据行。
 const gutter = new GutterView(
    table,
    tableElement,
@@ -79,6 +84,7 @@ const gutter = new GutterView(
 
 // 首次打开或重载后，等表格就绪再向宿主请求文档快照。
 table.on("tableBuilt", () => {
+   gutter.attachScrollTrack();
    vscode.postMessage({ type: "ready" });
    updateKeyboardMode(true);
 });
@@ -349,7 +355,7 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
             selectAndRevealCell(nextSelection.row, nextSelection.column);
          }
       } else if (data.type === "gutter" && data.revision === snapshot?.revision) {
-         gutter.update(data.gutter);
+         gutter.update(data.gutter, snapshot?.header?.id);
       }
       refreshControls();
    }).catch(() => {
