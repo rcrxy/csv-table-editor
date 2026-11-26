@@ -88,6 +88,11 @@
                 "title": "删除当前列",
                 "command": "csv-table-editor.deleteColumn",
                 "enablement": "true"
+            },
+            {
+                "title": "清空缓存并重新打开",
+                "command": "csv-table-editor.clearAndReloadTable",
+                "enablement": "true"
             }
         ],
         "menus": {
@@ -103,7 +108,8 @@
                 { "command": "csv-table-editor.insertColumnLeft", "when": "false" },
                 { "command": "csv-table-editor.insertColumnRight", "when": "false" },
                 { "command": "csv-table-editor.deleteRow", "when": "false" },
-                { "command": "csv-table-editor.deleteColumn", "when": "false" }
+                { "command": "csv-table-editor.deleteColumn", "when": "false" },
+                { "command": "csv-table-editor.clearAndReloadTable", "when": "false" }
             ],
             "webview/context": [
                 {
@@ -165,8 +171,30 @@
                     "command": "csv-table-editor.deleteColumn",
                     "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'header')",
                     "group": "6_delete@2"
+                },
+                {
+                    "command": "csv-table-editor.clearAndReloadTable",
+                    "when": "webviewId == 'csv-table-editor.table'",
+                    "group": "6_delete@3"
                 }
             ]
+        },
+        "configuration":{
+            "title": "CSV 表格编辑器",
+            "properties": {
+                "csv-table-editor.cellMaxCell": {
+                    "type":"number",
+                    "default": 400,
+                    "order": 1,
+                    "description": "首次打开时，单元格的最大宽度"
+                },
+                "csv-table-editor.tableHeader": {
+                    "type": "boolean",
+                    "default": true,
+                    "order": 2,
+                    "description": "设置第一行为表头"
+                }
+            }
         }
     },
     "scripts": {
