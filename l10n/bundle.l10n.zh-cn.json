@@ -1,0 +1,11 @@
+{
+   "Save": "保存",
+   "Don't Save": "不保存",
+   "Cancel": "取消",
+   "Save changes to {0} before reopening the table?": "重新打开表格前，是否保存对 {0} 的更改？",
+   "The current file's saved column widths and delimiter will be cleared when the table reopens.": "重新打开时会清除当前文件保存的列宽和分隔符。",
+   "VS Code could not save this file.": "VS Code 无法保存此文件。",
+   "The file changed while the dialog was open. Review the changes and try again.": "弹窗打开期间文件发生了变化。请检查更改后重试。",
+   "VS Code could not discard the unsaved changes.": "VS Code 无法丢弃未保存的更改。",
+   "Could not clear the table cache and reopen: {0}": "无法清空缓存并重新打开表格：{0}"
+}

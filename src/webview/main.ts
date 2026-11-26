@@ -27,6 +27,7 @@ const widths = new Map<string, number>();
 // 文档快照来自扩展宿主，行列选择、列宽和冻结范围属于当前视图。
 let snapshot: Snapshot | undefined;
 let pending: number | undefined;
+let reloadAfterEdit = false;
 let selectedRow: number | undefined;
 let selectedColumn: number | undefined;
 let selectedCell: { row: number; column: number } | undefined;
@@ -302,9 +303,13 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
       } else if (data.type === "editResult" && data.revision === pending) {
          pending = undefined;
          notice = data.error ?? "";
+         const shouldReload = reloadAfterEdit;
+         reloadAfterEdit = false;
          if (data.error) {
             selectRow(undefined);
             selectColumn(undefined);
+         } else if (shouldReload) {
+            vscode.postMessage({ type: "clearAndReload" });
          }
       } else if (data.type === "gutter" && data.revision === snapshot?.revision) {
          gutter.update(data.gutter);
@@ -312,6 +317,7 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
       refreshControls();
    }).catch(() => {
       pending = undefined;
+      reloadAfterEdit = false;
       notice = "Unable to update the table. Reopen this editor to reload the document.";
       refreshControls();
    });
@@ -377,6 +383,16 @@ function updateKeyboardMode(force = false): void {
 
 function runTableAction(action: TableAction): void {
    if (composing) {
+      return;
+   }
+   if (action.kind === "prepareCacheReload") {
+      // 先提交单元格草稿，等宿主更新文档后再判断是否有未保存内容。
+      submitCellEdit(false);
+      if (pending === undefined) {
+         vscode.postMessage({ type: "clearAndReload" });
+      } else {
+         reloadAfterEdit = true;
+      }
       return;
    }
    if (action.kind === "editStructureFromMenu") {

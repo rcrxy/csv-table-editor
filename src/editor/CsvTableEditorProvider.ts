@@ -172,6 +172,7 @@ class DocumentController {
    private ready = false;
    private disposed = false;
    private editing = false;
+   private reloading = false;
    private pickingDelimiter = false;
    private textWrapping = false;
    private readonly git: GitGutter;
@@ -239,6 +240,94 @@ class DocumentController {
 
    get canMoveTableStructure(): boolean {
       return this.keyboardMode === "grid" && this.hasSelectedCell;
+   }
+
+   private async clearAndReload(): Promise<void> {
+      const tabs = vscode.window.tabGroups;
+      const tab = tabs.activeTabGroup.activeTab;
+      const uri = this.document.uri;
+      if (
+         this.reloading ||
+         this.editing ||
+         this.disposed ||
+         !this.panel.active ||
+         !(tab?.input instanceof vscode.TabInputCustom) ||
+         tab.input.viewType !== viewType ||
+         tab.input.uri.toString() !== uri.toString()
+      ) {
+         return;
+      }
+
+      this.reloading = true;
+      try {
+         if (this.document.isDirty && !(await this.confirmReload(tab))) {
+            return;
+         }
+         if (!this.isActiveTab(tab) || this.document.isDirty) {
+            return;
+         }
+         const options = { viewColumn: tab.group.viewColumn, preview: tab.isPreview };
+         if (!(await tabs.close(tab))) {
+            return;
+         }
+         try {
+            const state = this.context.workspaceState;
+            await Promise.all([state.update(this.delimiterKey, undefined), state.update(this.columnWidthsKey, undefined)]);
+         } finally {
+            await vscode.commands.executeCommand("vscode.openWith", uri, viewType, options);
+         }
+      } catch (failure) {
+         const message = failure instanceof Error ? failure.message : String(failure);
+         void vscode.window.showErrorMessage(vscode.l10n.t("Could not clear the table cache and reopen: {0}", message));
+      } finally {
+         this.reloading = false;
+      }
+   }
+
+   private async confirmReload(tab: vscode.Tab): Promise<boolean> {
+      const version = this.document.version;
+      const save = { title: vscode.l10n.t("Save") };
+      const discard = { title: vscode.l10n.t("Don't Save") };
+      const cancel = { title: vscode.l10n.t("Cancel"), isCloseAffordance: true };
+      const choice = await vscode.window.showWarningMessage(
+         vscode.l10n.t("Save changes to {0} before reopening the table?", tab.label),
+         {
+            modal: true,
+            detail: vscode.l10n.t("The current file's saved column widths and delimiter will be cleared when the table reopens."),
+         },
+         save,
+         discard,
+         cancel,
+      );
+      if ((choice !== save && choice !== discard) || !this.isActiveTab(tab)) {
+         return false;
+      }
+      if (!this.document.isDirty) {
+         return true;
+      }
+      if (choice === save) {
+         if (!(await this.document.save())) {
+            throw new Error(vscode.l10n.t("VS Code could not save this file."));
+         }
+      } else {
+         // 原生还原命令优先处理有焦点的编辑器列表，因此先聚焦当前表格所在的编辑器组。
+         await vscode.commands.executeCommand("workbench.action.focusActiveEditorGroup");
+         if (!this.isActiveTab(tab)) {
+            return false;
+         }
+         if (this.document.version !== version) {
+            throw new Error(vscode.l10n.t("The file changed while the dialog was open. Review the changes and try again."));
+         }
+         await vscode.commands.executeCommand("workbench.action.files.revert");
+         if (this.document.isDirty) {
+            throw new Error(vscode.l10n.t("VS Code could not discard the unsaved changes."));
+         }
+      }
+      return !this.document.isDirty;
+   }
+
+   private isActiveTab(tab: vscode.Tab): boolean {
+      return !this.disposed && this.panel.active && vscode.window.tabGroups.activeTabGroup.activeTab === tab;
    }
 
    async selectDelimiter(): Promise<void> {
@@ -342,6 +431,8 @@ class DocumentController {
          this.git.schedule();
       } else if (message.type === "delimiter") {
          await this.selectDelimiter();
+      } else if (message.type === "clearAndReload") {
+         await this.clearAndReload();
       } else if (message.type === "keyboardMode") {
          this.keyboardMode = message.mode;
          this.hasSelectedCell = message.hasSelectedCell;
@@ -452,7 +543,7 @@ function isWebviewMessage(value: unknown): value is WebviewMessage {
    if (!isRecord(value)) {
       return false;
    }
-   if (value.type === "ready" || value.type === "delimiter") {
+   if (value.type === "ready" || value.type === "delimiter" || value.type === "clearAndReload") {
       return true;
    }
    if (value.type === "keyboardMode") {

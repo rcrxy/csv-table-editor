@@ -13,6 +13,7 @@ export type StructureMenuCommand =
 export type TableAction =
    | { kind: "moveCellSelection" | "moveTableStructure"; direction: TableDirection }
    | { kind: "editCell"; target?: { row: number; column: number; revision: number; version: number } }
+   | { kind: "prepareCacheReload" }
    | {
         kind: "editStructureFromMenu";
         command: StructureMenuCommand;
@@ -33,6 +34,7 @@ export type Operation =
 export type WebviewMessage =
    | { type: "ready" }
    | { type: "delimiter" }
+   | { type: "clearAndReload" }
    | { type: "keyboardMode"; mode: KeyboardMode; hasSelectedCell: boolean }
    | { type: "columnResized"; column: number; width: number }
    | { type: "save"; revision: number; version: number }

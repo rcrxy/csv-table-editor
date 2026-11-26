@@ -19,6 +19,9 @@ export function activate(context: vscode.ExtensionContext): void {
          webviewOptions: { retainContextWhenHidden: true },
       }),
       vscode.commands.registerCommand("csv-table-editor.selectDelimiter", () => provider.selectDelimiter()),
+      vscode.commands.registerCommand("csv-table-editor.clearAndReloadTable", () =>
+         provider.runTableAction({ kind: "prepareCacheReload" }),
+      ),
       vscode.commands.registerCommand("csv-table-editor.toggleTextWrapping", (resource?: vscode.Uri) =>
          provider.toggleTextWrapping(resource),
       ),
