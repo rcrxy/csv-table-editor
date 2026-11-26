@@ -1,0 +1,244 @@
+:root {
+   color-scheme: light dark;
+   --table-line: var(--vscode-panel-border, transparent);
+   --git-added: var(--vscode-editorGutter-addedBackground, #2ea043);
+   --git-modified: var(--vscode-editorGutter-modifiedBackground, #3794ff);
+   --git-deleted: var(--vscode-editorGutter-deletedBackground, #f14c4c);
+}
+
+body.vscode-light,
+body.vscode-high-contrast-light {
+   color-scheme: light;
+}
+
+body.vscode-dark,
+body.vscode-high-contrast:not(.vscode-high-contrast-light) {
+   color-scheme: dark;
+}
+
+body {
+   display: flex;
+   flex-direction: column;
+   height: 100vh;
+   margin: 0;
+   padding: 0;
+   overflow: hidden;
+   background: var(--vscode-editor-background);
+   color: var(--vscode-editor-foreground);
+   font: var(--vscode-font-weight) var(--vscode-font-size) var(--vscode-font-family);
+}
+
+#toolbar {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 5px 12px;
+   align-items: center;
+   padding: 6px 10px 4px;
+}
+
+.actions {
+   display: flex;
+   flex-wrap: wrap;
+   gap: 4px;
+}
+
+#toolbar button {
+   padding: 3px 7px;
+   border: 1px solid var(--vscode-button-border, transparent);
+   border-radius: 2px;
+   background: var(--vscode-button-secondaryBackground);
+   color: var(--vscode-button-secondaryForeground);
+   font: inherit;
+}
+
+#toolbar button:hover:not(:disabled) {
+   background: var(--vscode-button-secondaryHoverBackground);
+   cursor: pointer;
+}
+
+#toolbar button:disabled {
+   opacity: 0.5;
+}
+
+button:focus-visible,
+#table:focus-visible {
+   outline: 1px solid var(--vscode-focusBorder);
+   outline-offset: -1px;
+}
+
+#status {
+   padding: 3px 10px 6px;
+   color: var(--vscode-descriptionForeground);
+}
+
+#status.error {
+   color: var(--vscode-errorForeground);
+}
+
+#workspace {
+   display: flex;
+   flex: 1;
+   min-height: 0;
+   border-top: 1px solid var(--table-line);
+}
+
+#table {
+   flex: 1;
+   min-width: 0;
+}
+
+.tabulator,
+.tabulator .tabulator-tableholder .tabulator-table,
+.tabulator .tabulator-row {
+   border: 0;
+   background: var(--vscode-editor-background);
+   color: var(--vscode-editor-foreground);
+   font-size: inherit;
+}
+
+.tabulator .tabulator-header,
+.tabulator .tabulator-header .tabulator-col {
+   border-color: var(--table-line);
+   background: var(--vscode-editorGroupHeader-tabsBackground, var(--vscode-editor-background));
+   color: var(--vscode-editor-foreground);
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-col-title {
+   white-space: pre;
+   text-overflow: ellipsis;
+}
+
+.tabulator .tabulator-header .tabulator-col.tabulator-sortable:hover,
+.tabulator .tabulator-header .tabulator-col.selected-column {
+   background: var(--vscode-list-hoverBackground);
+   color: var(--vscode-list-hoverForeground, var(--vscode-editor-foreground));
+}
+
+.tabulator .tabulator-header .tabulator-col.selected-column {
+   box-shadow: inset 0 2px var(--vscode-focusBorder);
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter input,
+.tabulator .tabulator-row .tabulator-cell textarea {
+   border: 1px solid var(--vscode-input-border, var(--table-line));
+   border-radius: 2px;
+   background: var(--vscode-input-background);
+   color: var(--vscode-input-foreground);
+   font: inherit;
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter input::placeholder {
+   color: var(--vscode-input-placeholderForeground);
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter input:focus,
+.tabulator .tabulator-row .tabulator-cell textarea:focus {
+   outline: 1px solid var(--vscode-focusBorder);
+   outline-offset: -1px;
+}
+
+.tabulator .tabulator-row .tabulator-cell {
+   border-right: 1px solid var(--table-line);
+   border-bottom: 1px solid var(--table-line);
+   background: inherit;
+   color: inherit;
+}
+
+.tabulator .tabulator-row .tabulator-cell.data-cell {
+   padding: 4px 7px;
+   white-space: pre-wrap;
+   overflow-wrap: anywhere;
+}
+
+.tabulator .tabulator-row .tabulator-cell.tabulator-editing {
+   padding: 0;
+   border: 1px solid var(--vscode-focusBorder);
+}
+
+.tabulator .tabulator-row.selected-record {
+   background: var(--vscode-list-inactiveSelectionBackground);
+   color: var(--vscode-list-inactiveSelectionForeground, var(--vscode-editor-foreground));
+}
+
+.tabulator .tabulator-tableholder .tabulator-placeholder .tabulator-placeholder-contents {
+   color: var(--vscode-descriptionForeground);
+   font-size: inherit;
+   font-weight: normal;
+}
+
+.tabulator .tabulator-row .tabulator-cell.gutter-cell {
+   padding: 0;
+   color: var(--vscode-editorLineNumber-foreground);
+}
+
+.record-gutter,
+#end-markers {
+   position: relative;
+   display: block;
+   box-sizing: border-box;
+   min-height: 21px;
+   padding: 3px 7px;
+}
+
+.header-gutter {
+   text-align: right;
+}
+
+#end-markers {
+   padding-left: 12px;
+   border-top: 1px solid var(--table-line);
+   color: var(--vscode-descriptionForeground);
+}
+
+#end-markers[hidden] {
+   display: none;
+}
+
+.gutter-strip {
+   position: absolute;
+   inset: 0 auto 0 0;
+   width: 3px;
+}
+
+.gutter-strip.deleted {
+   height: 3px;
+   width: 9px;
+}
+
+#overview {
+   position: relative;
+   flex: 0 0 15px;
+   border-left: 1px solid var(--table-line);
+   background: var(--vscode-editorOverviewRuler-background, var(--vscode-editor-background));
+}
+
+.overview-marker {
+   position: absolute;
+   left: 1px;
+   width: 7px;
+   height: 4px;
+   padding: 0;
+   border: 0;
+   transform: translateY(-50%);
+   cursor: pointer;
+}
+
+.overview-marker.deleted {
+   left: 8px;
+   width: 6px;
+}
+
+.gutter-strip.added,
+.overview-marker.added {
+   background: var(--git-added);
+}
+
+.gutter-strip.modified,
+.overview-marker.modified {
+   background: var(--git-modified);
+}
+
+.gutter-strip.deleted,
+.overview-marker.deleted {
+   background: var(--git-deleted);
+}

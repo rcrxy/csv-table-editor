@@ -10,8 +10,8 @@
 ## 项目现状
 
 - 本项目是 VS Code 扩展，目标是在 VS Code 内将 CSV 和 TSV 文件解析并呈现为表格。
-- `package.json` 声明扩展入口和 VS Code 贡献点。`src/extension.ts` 是扩展宿主入口，由 `esbuild.js` 打包为 `dist/extension.js`。
-- 当前入口仍注册模板的 Hello World 命令。Papa Parse 和 Tabulator 已安装，CSV/TSV 解析和表格视图尚未接入。
+- `package.json` 声明自定义文本编辑器和分隔符命令。`src/extension.ts` 是扩展宿主入口，由 `esbuild.js` 构建为 `dist/extension.js`。
+- `src/core/` 处理解析和文本编辑。`src/editor/` 负责文档同步和 Webview 配置。`src/git/` 通过 VS Code 内置 Git 扩展生成变更标记。`src/webview/` 使用 Tabulator 呈现表格，独立构建为 `dist/webview.js` 和 `dist/webview.css`。
 
 ## 开发约定
 
