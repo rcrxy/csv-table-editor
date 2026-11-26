@@ -1,0 +1,6 @@
+declare module "*.css";
+
+declare module "*.html" {
+   const markup: string;
+   export default markup;
+}

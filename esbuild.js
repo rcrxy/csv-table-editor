@@ -12,7 +12,13 @@ async function main() {
          outfile: "dist/extension.js",
          external: ["vscode"],
       },
-      { entryPoints: ["src/webview/main.ts"], platform: "browser", format: "iife", outfile: "dist/webview.js" },
+      {
+         entryPoints: ["src/webview/main.ts"],
+         platform: "browser",
+         format: "iife",
+         outfile: "dist/webview.js",
+         loader: { ".html": "text" },
+      },
    ];
    const pending = new Set(entries);
    const contexts = [];

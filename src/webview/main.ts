@@ -1,12 +1,14 @@
 import { TabulatorFull as Tabulator, type CellComponent, type ColumnDefinition } from "tabulator-tables";
 import "tabulator-tables/dist/css/tabulator.min.css";
 import "./styles.css";
+import markup from "./body.html";
 import type { Direction, HostMessage, Operation, Snapshot, WebviewMessage } from "../shared/messages";
 import { GutterView } from "./GutterView";
 
 declare function acquireVsCodeApi(): { postMessage(message: WebviewMessage): void };
 
 const vscode = acquireVsCodeApi();
+document.body.insertAdjacentHTML("afterbegin", markup);
 const tableElement = document.getElementById("table")!;
 const statusElement = document.getElementById("status")!;
 const delimiterButton = button("delimiter");
