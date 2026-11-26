@@ -224,16 +224,6 @@
                     "group": "1_cell@2"
                 },
                 {
-                    "command": "csv-table-editor.clearFilter",
-                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'header')",
-                    "group": "2_filter@1"
-                },
-                {
-                    "command": "csv-table-editor.resetAllFilters",
-                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'header'",
-                    "group": "2_filter@2"
-                },
-                {
                     "command": "csv-table-editor.freezeCell",
                     "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell'",
                     "group": "3_freeze@1"

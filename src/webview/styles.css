@@ -122,7 +122,7 @@ button:focus-visible,
 
 /* 表头和数据行悬浮时使用 VS Code 菜单项的高亮色。 */
 @media (hover: hover) and (pointer: fine) {
-   .tabulator .tabulator-header .tabulator-col.tabulator-sortable:hover,
+   .tabulator .tabulator-header .tabulator-col.data-cell:hover,
    .tabulator .tabulator-row.tabulator-selectable:hover {
       background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
       color: var(--vscode-menu-selectionForeground, var(--vscode-editor-foreground));

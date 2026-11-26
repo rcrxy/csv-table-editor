@@ -48,7 +48,7 @@ const table = new Tabulator(tableElement, {
    index: "id",
    height: "100%",
    layout: "fitDataFill",
-   headerSortClickElement: "icon",
+   columnDefaults: { headerSort: false },
    editTriggerEvent: "dblclick",
    keybindings: { navUp: false, navDown: false, navLeft: false, navRight: false },
    placeholder: "No data records",
@@ -121,7 +121,6 @@ table.on("dataFiltered", (_filters, rows) => {
       refreshControls();
    }
 });
-table.on("dataSorted", refreshControls);
 table.on("cellEditing", (cell) => {
    editingCell = cell;
    editorBlurring = false;
@@ -226,7 +225,7 @@ type MenuTarget =
    | { webviewSection: "cell"; rowId: number; field: string }
    | { webviewSection: "header"; field: string };
 
-// 菜单定位使用源记录 ID。无表头时，删除列的入口取排序和筛选后的第一行。
+// 菜单定位使用源记录 ID。无表头时，删除列的入口取当前视图的第一行。
 function menuStructureOperation(
    command: StructureMenuCommand,
    field: string | undefined,
@@ -379,7 +378,6 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
 // };
 // reset.onclick = () => {
 //    table.clearFilter(true);
-//    table.clearSort();
 //    refreshControls();
 // };
 
@@ -490,7 +488,7 @@ function submitCellEdit(save: boolean, moveToNextRow = false): void {
    }
    const currentRow = cell.getRow();
    const row = Number(currentRow.getIndex());
-   // 按提交前的表格顺序定位下一行，避免编辑影响排序或筛选后跳到其他记录。
+   // 按提交前的表格顺序定位下一行，避免提交后筛选结果变化导致跳行。
    const nextRow = moveToNextRow && currentRow.getNextRow();
    const nextSelection = nextRow ? { row: Number(nextRow.getIndex()), column } : undefined;
    const value = input.value;
@@ -627,22 +625,22 @@ function selectAndRevealCell(row: number, column: number): void {
    }
 }
 
-function hasViewOrder(): boolean {
-   return table.getSorters().length > 0 || table.getHeaderFilters().length > 0;
+function hasHeaderFilters(): boolean {
+   return table.getHeaderFilters().length > 0;
 }
 
 function dataRecord(view: Snapshot, id: number | undefined) {
    return id === undefined ? undefined : view.records[id - (view.tableHeader ? 1 : 0)];
 }
 
-// 行移动依赖源文件顺序，排序或筛选生效时暂停行移动。
+// 行移动依赖源文件顺序，筛选生效时暂停行移动。
 function moveSelection(vertical: boolean, direction: Direction): void {
    if (!snapshot || !selectedCell) {
       return;
    }
    const { row, column } = selectedCell;
-   if (vertical && hasViewOrder()) {
-      notice = "Clear sorting and filters before moving a row.";
+   if (vertical && hasHeaderFilters()) {
+      notice = "Clear filters before moving a row.";
       refreshControls();
    } else if (vertical) {
       const next = row + direction;
@@ -672,7 +670,7 @@ function send(operation: Operation | undefined, save = false): boolean {
    return true;
 }
 
-// 列结构变化时重建列，沿用列宽与仍存在的列的排序和筛选值。
+// 列结构变化时重建列，沿用列宽与仍存在的列的筛选值。
 function applyColumns(next: Snapshot): void {
    const headers = Array.from({ length: next.columnCount }, (_, index) => next.header?.values[index] ?? "");
    const lineDigits = next.showRowNumbers ? Math.max(4, String(next.records.at(-1)?.line ?? 0).length) : undefined;
@@ -682,10 +680,6 @@ function applyColumns(next: Snapshot): void {
    }
    measureInitialWidths(tableElement, next, widths);
    renderedColumns = key;
-   const sorters = table
-      .getSorters()
-      .filter(({ field }) => (columnIndex(field) ?? Infinity) < headers.length)
-      .map(({ field, dir }) => ({ column: field, dir }));
    const filters = table.getHeaderFilters().filter(({ field }) => (columnIndex(field) ?? Infinity) < headers.length);
    const columns: ColumnDefinition[] = headers.map((name, index) => {
       const field = `c${index}`;
@@ -694,8 +688,6 @@ function applyColumns(next: Snapshot): void {
          title: `Column ${index + 1}`,
          titleFormatter: () => asText(name || `Column ${index + 1}`),
          field,
-         sorter: "string",
-         headerSortTristate: true,
          frozen: index < frozenCount,
          width,
          minWidth: Math.min(80, next.cellMaxWidth, width),
@@ -731,19 +723,14 @@ function applyColumns(next: Snapshot): void {
          frozen: true,
          width: lineWidth,
          minWidth: lineWidth,
-         headerSort: false,
          resizable: false,
          hozAlign: "right",
          cssClass: "gutter-cell",
          formatter: (cell) => gutter.record({ id: Number(cell.getRow().getIndex()), line: Number(cell.getValue()) }),
       });
    }
-   table.clearSort();
    table.clearHeaderFilter();
    table.setColumns(columns);
-   if (sorters.length) {
-      table.setSort(sorters);
-   }
    for (const { field, value } of filters) {
       table.setHeaderFilterValue(field, String(value));
    }
@@ -811,7 +798,7 @@ function refreshControls(): void {
    // freeze.disabled = !editable || (selectedColumn === undefined && frozenCount === 0);
    const unfreeze = frozenCount > 0 && (selectedColumn === undefined || frozenCount === selectedColumn + 1);
    // freeze.textContent = unfreeze ? "Unfreeze columns" : "Freeze through column";
-   // reset.disabled = !snapshot || busy || !hasViewOrder();
+   // reset.disabled = !snapshot || busy || !hasHeaderFilters();
    if (!snapshot) {
       return;
    }
