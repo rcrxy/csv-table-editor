@@ -57,6 +57,10 @@
                 "title": "%command.submitCellEdit%"
             },
             {
+                "command": "csv-table-editor.insertCellLineBreak",
+                "title": "%command.insertCellLineBreak%"
+            },
+            {
                 "title": "%command.clearCell%",
                 "command": "csv-table-editor.clearCell",
                 "enablement": "true"
@@ -148,7 +152,7 @@
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
             },
             {
-                "command": "csv-table-editor.submitCellEdit",
+                "command": "csv-table-editor.insertCellLineBreak",
                 "key": "enter",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
             },
@@ -194,6 +198,7 @@
                 { "command": "csv-table-editor.moveColumnLeft", "when": "false" },
                 { "command": "csv-table-editor.moveColumnRight", "when": "false" },
                 { "command": "csv-table-editor.submitCellEdit", "when": "false" },
+                { "command": "csv-table-editor.insertCellLineBreak", "when": "false" },
                 { "command": "csv-table-editor.clearCell", "when": "false" },
                 { "command": "csv-table-editor.clearFilter", "when": "false" },
                 { "command": "csv-table-editor.resetAllFilters", "when": "false" },

@@ -1,4 +1,7 @@
-import { isAbsolute, relative, sep } from "node:path";
+import { execFile } from "node:child_process";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { isAbsolute, join, relative, sep } from "node:path";
 import * as vscode from "vscode";
 import type { ParsedDocument } from "../core/CsvParser";
 import { scanSource, type RecordSpan } from "../core/SourceScanner";
@@ -14,7 +17,6 @@ interface GitRepository {
    readonly rootUri: vscode.Uri;
    readonly state: {
       readonly onDidChange: vscode.Event<void>;
-      readonly HEAD?: { readonly commit?: string };
       readonly indexChanges: GitChange[];
       readonly workingTreeChanges: GitChange[];
       readonly untrackedChanges: GitChange[];
@@ -24,6 +26,7 @@ interface GitRepository {
 }
 
 interface GitApi {
+   readonly git: { readonly path: string };
    readonly onDidOpenRepository: vscode.Event<GitRepository>;
    readonly onDidCloseRepository: vscode.Event<GitRepository>;
    getRepository(uri: vscode.Uri): GitRepository | null;
@@ -113,14 +116,15 @@ export class GitGutter implements vscode.Disposable {
       const { parsed, revision } = this.current();
       let gutter: Gutter | undefined;
       try {
-         const repository = this.api?.getRepository(this.document.uri) ?? null;
+         const api = this.api;
+         const repository = api?.getRepository(this.document.uri) ?? null;
          if (repository !== this.repository) {
             this.repositoryListener?.dispose();
             this.repository = repository;
             this.repositoryListener = repository?.state.onDidChange(() => this.schedule());
          }
-         if (repository && parsed) {
-            gutter = await this.readChanges(repository, parsed);
+         if (api && repository && parsed) {
+            gutter = await this.readChanges(api.git.path, repository, parsed);
          }
       } catch {
          // Missing or unavailable Git data leaves the table usable.
@@ -130,7 +134,7 @@ export class GitGutter implements vscode.Disposable {
       }
    }
 
-   private async readChanges(repository: GitRepository, parsed: ParsedDocument): Promise<Gutter | undefined> {
+   private async readChanges(gitPath: string, repository: GitRepository, parsed: ParsedDocument): Promise<Gutter | undefined> {
       const path = relative(repository.rootUri.fsPath, this.document.uri.fsPath);
       if (!path || isAbsolute(path) || path === ".." || path.startsWith(".." + sep)) {
          return;
@@ -140,24 +144,58 @@ export class GitGutter implements vscode.Disposable {
       const isNew =
          state.untrackedChanges.some(matches) ||
          state.workingTreeChanges.some((change) => change.status === untracked && matches(change)) ||
-         (!state.HEAD?.commit && state.indexChanges.some((change) => change.status === indexAdded && matches(change)));
+         state.indexChanges.some((change) => change.status === indexAdded && matches(change));
       if (isNew) {
          return mapChanges(parsed, parsed.rows.map(({ startLine }) => ({ line: startLine, status: "added" })));
       }
-      // Git's worktree patch refers to the saved file. Its line numbers can diverge from a dirty buffer.
-      if (this.document.isDirty) {
-         return;
-      }
       const relativePath = path.split(sep).join("/");
-      const changes = parseDiff(await repository.diffWith("HEAD", `:(literal)${relativePath}`));
+      // 未保存时直接比较 HEAD 和当前快照，差异位置与表格使用同一份文档内容。
+      const headText = this.document.isDirty ? await repository.show("HEAD", relativePath) : undefined;
+      const patch =
+         headText === undefined
+            ? await repository.diffWith("HEAD", `:(literal)${relativePath}`)
+            : await diffBuffer(gitPath, headText, parsed.text);
+      const changes = parseDiff(patch);
       let previousRows: RecordSpan[] | undefined;
       if (changes.some(({ status }) => status === "deleted")) {
          try {
-            previousRows = scanSource(await repository.show("HEAD", relativePath), parsed.delimiter);
+            previousRows = scanSource(headText ?? (await repository.show("HEAD", relativePath)), parsed.delimiter);
          } catch {
             // If HEAD cannot be parsed with this delimiter, anchor deletions using the current records.
          }
       }
       return mapChanges(parsed, changes, previousRows);
+   }
+}
+
+function normalizeDiffText(text: string): string {
+   return text.replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+}
+
+async function diffBuffer(gitPath: string, head: string, current: string): Promise<string> {
+   const headText = normalizeDiffText(head);
+   const currentText = normalizeDiffText(current);
+   if (headText === currentText) {
+      return "";
+   }
+   const directory = await mkdtemp(join(tmpdir(), "csv-table-editor-git-"));
+   try {
+      // 临时文件只包含已提交的 HEAD 内容。未保存的内容通过标准输入传给 Git。
+      await writeFile(join(directory, "head"), headText, "utf8");
+      const args = ["diff", "--no-index", "--no-color", "--no-ext-diff", "--no-textconv", "--text", "--unified=0", "--", "head", "-"];
+      return await new Promise<string>((resolve, reject) => {
+         const child = execFile(gitPath, args, { cwd: directory, encoding: "utf8", maxBuffer: 16 * 1024 * 1024 }, (error, stdout) => {
+            // git diff --no-index 用退出码 1 表示发现差异。
+            if (error && error.code !== 1) {
+               reject(error);
+            } else {
+               resolve(stdout);
+            }
+         });
+         child.stdin?.on("error", () => child.kill());
+         child.stdin?.end(currentText, "utf8");
+      });
+   } finally {
+      await rm(directory, { recursive: true, force: true });
    }
 }

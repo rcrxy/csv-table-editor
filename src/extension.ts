@@ -45,6 +45,9 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.commands.registerCommand("csv-table-editor.submitCellEdit", (save?: boolean) =>
          provider.runTableAction({ kind: "submitCellEdit", save: save === true }),
       ),
+      vscode.commands.registerCommand("csv-table-editor.insertCellLineBreak", () =>
+         provider.runTableAction({ kind: "insertCellLineBreak" }),
+      ),
    );
 }
 

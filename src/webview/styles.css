@@ -132,19 +132,21 @@ button:focus-visible,
 /* 筛选输入框和单元格编辑框共用 VS Code 输入框样式。 */
 .tabulator .tabulator-header .tabulator-col .tabulator-header-filter input,
 .tabulator .tabulator-row .tabulator-cell textarea {
-   border: 1px solid var(--vscode-input-border, var(--table-line));
-   border-radius: 2px;
    background: var(--vscode-input-background);
    color: var(--vscode-input-foreground);
    font: inherit;
+}
+
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter input {
+   border: 1px solid var(--vscode-input-border, var(--table-line));
+   border-radius: 2px;
 }
 
 .tabulator .tabulator-header .tabulator-col .tabulator-header-filter input::placeholder {
    color: var(--vscode-input-placeholderForeground);
 }
 
-.tabulator .tabulator-header .tabulator-col .tabulator-header-filter input:focus,
-.tabulator .tabulator-row .tabulator-cell textarea:focus {
+.tabulator .tabulator-header .tabulator-col .tabulator-header-filter input:focus {
    outline: 1px solid var(--vscode-focusBorder);
    outline-offset: -1px;
 }
@@ -180,6 +182,7 @@ button:focus-visible,
    max-width: 100%;
    min-width: 0;
    border: 0;
+   outline: none;
    overflow: hidden;
    white-space: pre-wrap;
    overflow-wrap: anywhere;

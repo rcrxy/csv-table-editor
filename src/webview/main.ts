@@ -28,6 +28,7 @@ const widths = new Map<string, number>();
 let snapshot: Snapshot | undefined;
 let pending: number | undefined;
 let reloadAfterEdit = false;
+let selectionAfterEdit: { row: number; column: number } | undefined;
 let selectedRow: number | undefined;
 let selectedColumn: number | undefined;
 let selectedCell: { row: number; column: number } | undefined;
@@ -35,6 +36,7 @@ let frozenCount = 0;
 let renderedColumns = "";
 let textWrapping = false;
 let editingCell: CellComponent | undefined;
+let editorBlurring = false;
 let keyboardMode: KeyboardMode = "inactive";
 let hasSelectedCell = false;
 let composing = false;
@@ -122,6 +124,7 @@ table.on("dataFiltered", (_filters, rows) => {
 table.on("dataSorted", refreshControls);
 table.on("cellEditing", (cell) => {
    editingCell = cell;
+   editorBlurring = false;
    const column = columnIndex(cell.getField());
    if (column !== undefined) {
       selectCell(Number(cell.getRow().getIndex()), column);
@@ -129,10 +132,24 @@ table.on("cellEditing", (cell) => {
    refreshControls();
 });
 table.on("cellEditCancelled", () => {
+   const restoreFocus = keyboardMode === "editing" && !editorBlurring;
    editingCell = undefined;
    composing = false;
    updateTextWrapping();
-   refreshControls();
+   // Tabulator 会移除输入框。等浏览器处理完焦点切换，再决定是否接回焦点。
+   queueMicrotask(() => {
+      if (editingCell) {
+         return;
+      }
+      if (restoreFocus && document.hasFocus() && document.activeElement === document.body) {
+         tableElement.focus({ preventScroll: true });
+      }
+      updateKeyboardMode();
+      if (keyboardMode === "inactive") {
+         clearCellSelection();
+      }
+      refreshControls();
+   });
 });
 table.on("cellEdited", (cell) => {
    editingCell = undefined;
@@ -146,8 +163,21 @@ table.on("cellEdited", (cell) => {
    refreshControls();
 });
 
-tableElement.addEventListener("focusin", () => updateKeyboardMode());
+tableElement.addEventListener("focusin", () => {
+   editorBlurring = false;
+   updateKeyboardMode();
+});
 tableElement.addEventListener("focusout", () => queueMicrotask(updateKeyboardMode));
+tableElement.addEventListener(
+   "blur",
+   ({ target }) => {
+      // 输入框仍在编辑单元格内时收到 blur，表示焦点原本就在离开输入框。
+      if (target instanceof HTMLTextAreaElement && target.closest(".tabulator-cell.tabulator-editing")) {
+         editorBlurring = true;
+      }
+   },
+   true,
+);
 window.addEventListener("focus", () => updateKeyboardMode());
 window.addEventListener("blur", () => updateKeyboardMode());
 tableElement.addEventListener("compositionstart", () => {
@@ -159,7 +189,7 @@ tableElement.addEventListener("compositionend", () => {
    updateKeyboardMode();
 });
 
-// VS Code 执行 Enter / Ctrl+Enter 命令。阻止浏览器先往编辑框里插入换行。
+// Enter 和 Ctrl+Enter 由 VS Code 命令处理，挡住浏览器可能先插入的换行。
 // Tabulator 的 Shift+Enter 直接更新编辑文本，仍可插入换行。
 tableElement.addEventListener("beforeinput", (event) => {
    if (
@@ -179,13 +209,17 @@ tableElement.addEventListener("input", ({ target }) => {
    if (!cell || !(target instanceof HTMLTextAreaElement) || !cell.getElement().contains(target)) {
       return;
    }
-   const previousHeight = target.style.height;
-   target.style.height = "auto";
-   target.style.height = `${target.scrollHeight}px`;
-   if (target.style.height !== previousHeight) {
+   resizeCellEditor(target, cell);
+});
+
+function resizeCellEditor(input: HTMLTextAreaElement, cell: CellComponent): void {
+   const previousHeight = input.style.height;
+   input.style.height = "auto";
+   input.style.height = `${input.scrollHeight}px`;
+   if (input.style.height !== previousHeight) {
       cell.getRow().normalizeHeight();
    }
-});
+}
 
 type MenuTarget =
    | { webviewSection: "row"; rowId: number; field?: string }
@@ -304,12 +338,16 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
          pending = undefined;
          notice = data.error ?? "";
          const shouldReload = reloadAfterEdit;
+         const nextSelection = selectionAfterEdit;
          reloadAfterEdit = false;
+         selectionAfterEdit = undefined;
          if (data.error) {
             selectRow(undefined);
             selectColumn(undefined);
          } else if (shouldReload) {
             vscode.postMessage({ type: "clearAndReload" });
+         } else if (nextSelection) {
+            selectAndRevealCell(nextSelection.row, nextSelection.column);
          }
       } else if (data.type === "gutter" && data.revision === snapshot?.revision) {
          gutter.update(data.gutter);
@@ -318,6 +356,7 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
    }).catch(() => {
       pending = undefined;
       reloadAfterEdit = false;
+      selectionAfterEdit = undefined;
       notice = "Unable to update the table. Reopen this editor to reload the document.";
       refreshControls();
    });
@@ -404,7 +443,16 @@ function runTableAction(action: TableAction): void {
    }
    if (action.kind === "submitCellEdit") {
       if (keyboardMode === "editing") {
-         submitCellEdit(action.save);
+         submitCellEdit(action.save, true);
+      }
+      return;
+   }
+   if (action.kind === "insertCellLineBreak") {
+      const cell = editingCell;
+      const input = cell?.getElement().querySelector("textarea");
+      if (keyboardMode === "editing" && cell && input) {
+         input.setRangeText("\n", input.selectionStart, input.selectionEnd, "end");
+         resizeCellEditor(input, cell);
       }
       return;
    }
@@ -433,20 +481,28 @@ function runTableAction(action: TableAction): void {
    }
 }
 
-function submitCellEdit(save: boolean): void {
+function submitCellEdit(save: boolean, moveToNextRow = false): void {
    const cell = editingCell;
    const input = cell?.getElement().querySelector("textarea");
    const column = cell && columnIndex(cell.getField());
    if (!cell || !input || column === undefined) {
       return;
    }
-   const row = Number(cell.getRow().getIndex());
+   const currentRow = cell.getRow();
+   const row = Number(currentRow.getIndex());
+   // 按提交前的表格顺序定位下一行，避免编辑影响排序或筛选后跳到其他记录。
+   const nextRow = moveToNextRow && currentRow.getNextRow();
+   const nextSelection = nextRow ? { row: Number(nextRow.getIndex()), column } : undefined;
    const value = input.value;
    const original = String(cell.getValue() ?? "").replace(/\r\n?/g, "\n");
    // 退出 Tabulator 的输入框，草稿通过既有的文档编辑流程提交。
    cell.cancelEdit();
    tableElement.focus({ preventScroll: true });
-   send(value === original ? undefined : { kind: "cell", row, column, value }, save);
+   if (send(value === original ? undefined : { kind: "cell", row, column, value }, save)) {
+      selectionAfterEdit = nextSelection;
+   } else if (!save && value === original && nextSelection) {
+      selectAndRevealCell(nextSelection.row, nextSelection.column);
+   }
 }
 
 function updateTextWrapping(): void {
@@ -559,11 +615,14 @@ function moveCellSelection(vertical: boolean, direction: Direction): void {
    if (!nextRow) {
       return;
    }
-   const id = Number(nextRow.getIndex());
-   const destination = cellAt(id, nextColumn);
-   if (destination) {
-      selectCell(id, nextColumn);
-      void table.scrollToRow(nextRow, "nearest", false).catch(() => {});
+   selectAndRevealCell(Number(nextRow.getIndex()), nextColumn);
+}
+
+function selectAndRevealCell(row: number, column: number): void {
+   const destination = cellAt(row, column);
+   if (destination && destination.getRow().getPosition() !== false) {
+      selectCell(row, column);
+      void table.scrollToRow(destination.getRow(), "nearest", false).catch(() => {});
       void table.scrollToColumn(destination.getField(), "middle", false).catch(() => {});
    }
 }
@@ -697,7 +756,18 @@ async function render(next: Snapshot): Promise<void> {
       return;
    }
    if (next.revision !== snapshot?.revision) {
-      gutter.update(undefined);
+      const previous = snapshot;
+      // 原始行号保持不变时，保留旧标记直到新的 Git 差异返回。
+      if (
+         !previous ||
+         next.error ||
+         next.delimiter !== previous.delimiter ||
+         next.tableHeader !== previous.tableHeader ||
+         next.records.length !== previous.records.length ||
+         next.records.some(({ line }, index) => line !== previous.records[index].line)
+      ) {
+         gutter.update(undefined);
+      }
       notice = "";
       if (pending === undefined || next.delimiter !== snapshot?.delimiter) {
          selectRow(undefined);

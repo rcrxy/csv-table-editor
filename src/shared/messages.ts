@@ -14,6 +14,7 @@ export type TableAction =
    | { kind: "moveCellSelection" | "moveTableStructure"; direction: TableDirection }
    | { kind: "editCell"; target?: { row: number; column: number; revision: number; version: number } }
    | { kind: "prepareCacheReload" }
+   | { kind: "insertCellLineBreak" }
    | {
         kind: "editStructureFromMenu";
         command: StructureMenuCommand;
