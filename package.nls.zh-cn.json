@@ -4,6 +4,7 @@
    "configuration.cellMaxCell.description": "打开文件时，按前 100 条数据记录自动计算列宽的上限（像素）。手动调整过的列会恢复保存的宽度。更改此设置后，重新打开文件即可应用到自动列宽。",
    "configuration.tableHeader.description": "将第一条记录用作表头。关闭后，第一条记录显示为数据行，列名使用 Column 1 等默认名称。更改此设置会立即更新已打开的表格。",
    "command.selectDelimiter": "CSV 表格编辑器：选择分隔符",
+   "command.toggleTextWrapping": "切换单元格文本换行",
    "command.editCell": "编辑单元格",
    "command.clearCell": "清空单元格",
    "command.clearFilter": "清空筛选",

@@ -151,16 +151,33 @@ button:focus-visible,
    color: inherit;
 }
 
-/* 保留字段内的换行和空白，长内容按列宽折行。 */
+/* 默认以单行显示数据，超出列宽时显示省略号。 */
 .tabulator .tabulator-row .tabulator-cell.data-cell {
    padding: 4px 7px;
+   white-space: nowrap;
+   overflow: hidden;
+   text-overflow: ellipsis;
+}
+
+.tabulator.wrap-cell-text .tabulator-row .tabulator-cell.data-cell {
    white-space: pre-wrap;
    overflow-wrap: anywhere;
+   text-overflow: clip;
 }
 
 .tabulator .tabulator-row .tabulator-cell.tabulator-editing {
    padding: 0;
    border: 1px solid var(--vscode-focusBorder);
+}
+
+/* 编辑框沿用列宽，换行和高度独立于浏览模式。 */
+.tabulator .tabulator-row .tabulator-cell.tabulator-editing textarea {
+   max-width: 100%;
+   min-width: 0;
+   border: 0;
+   overflow: hidden;
+   white-space: pre-wrap;
+   overflow-wrap: anywhere;
 }
 
 /* 这里控制选中行。普通数据行的悬浮色来自 Tabulator 的 .tabulator-selectable:hover。 */

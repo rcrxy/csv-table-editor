@@ -4,6 +4,7 @@
    "configuration.cellMaxCell.description": "Maximum automatic column width in pixels, based on the first 100 data rows when a file is opened. Manually resized columns keep their saved widths. Reopen the file to apply changes to automatic widths.",
    "configuration.tableHeader.description": "Use the first record as the table header. When disabled, the first record appears as a data row and columns use generated names such as Column 1. Changes apply immediately to open tables.",
    "command.selectDelimiter": "CSV Table Editor: Select Delimiter",
+   "command.toggleTextWrapping": "Toggle Cell Text Wrapping",
    "command.editCell": "Edit Cell",
    "command.clearCell": "Clear Cell",
    "command.clearFilter": "Clear Filter",

@@ -30,6 +30,11 @@
                 "title": "%command.selectDelimiter%"
             },
             {
+                "command": "csv-table-editor.toggleTextWrapping",
+                "title": "%command.toggleTextWrapping%",
+                "icon": "$(word-wrap)"
+            },
+            {
                 "title": "%command.editCell%",
                 "command": "csv-table-editor.editCell",
                 "enablement": "true"
@@ -96,7 +101,15 @@
             }
         ],
         "menus": {
+            "editor/title": [
+                {
+                    "command": "csv-table-editor.toggleTextWrapping",
+                    "when": "activeCustomEditorId == 'csv-table-editor.table'",
+                    "group": "navigation"
+                }
+            ],
             "commandPalette": [
+                { "command": "csv-table-editor.toggleTextWrapping", "when": "false" },
                 { "command": "csv-table-editor.editCell", "when": "false" },
                 { "command": "csv-table-editor.clearCell", "when": "false" },
                 { "command": "csv-table-editor.clearFilter", "when": "false" },

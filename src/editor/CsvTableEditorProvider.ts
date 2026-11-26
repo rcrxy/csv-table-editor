@@ -18,6 +18,13 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
       panel.onDidDispose(() => this.sessions.delete(session));
    }
 
+   toggleTextWrapping(resource?: vscode.Uri): void {
+      const session = [...this.sessions].find(({ document, panel }) =>
+         resource ? document.uri.toString() === resource.toString() : panel.active,
+      );
+      session?.toggleTextWrapping();
+   }
+
    async selectDelimiter(): Promise<void> {
       const session = [...this.sessions].find(({ panel }) => panel.active);
       if (session) {
@@ -41,11 +48,12 @@ class DocumentController {
    private disposed = false;
    private editing = false;
    private pickingDelimiter = false;
+   private textWrapping = false;
    private readonly git: GitGutter;
 
    constructor(
       private readonly context: vscode.ExtensionContext,
-      private readonly document: vscode.TextDocument,
+      readonly document: vscode.TextDocument,
       readonly panel: vscode.WebviewPanel,
    ) {
       this.delimiterKey = `delimiter:${document.uri.toString()}`;
@@ -89,6 +97,11 @@ class DocumentController {
          }),
       ];
       configureWebview(panel.webview, context.extensionUri);
+   }
+
+   toggleTextWrapping(): void {
+      this.textWrapping = !this.textWrapping;
+      this.post({ type: "textWrapping", enabled: this.textWrapping });
    }
 
    async selectDelimiter(): Promise<void> {
@@ -178,6 +191,7 @@ class DocumentController {
             this.updateSnapshot();
          }
          this.ready = true;
+         this.post({ type: "textWrapping", enabled: this.textWrapping });
          this.post({
             type: "snapshot",
             snapshot: this.snapshot,

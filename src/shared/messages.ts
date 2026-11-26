@@ -50,5 +50,6 @@ export interface Gutter {
 
 export type HostMessage =
    | { type: "snapshot"; snapshot: Snapshot; savedColumnWidths?: Record<string, number> }
+   | { type: "textWrapping"; enabled: boolean }
    | { type: "editResult"; revision: number; error?: string }
    | { type: "gutter"; revision: number; gutter?: Gutter };

@@ -22,6 +22,7 @@ let selectedRow: number | undefined;
 let selectedColumn: number | undefined;
 let frozenCount = 0;
 let renderedColumns = "";
+let textWrapping = false;
 let editingCell: CellComponent | undefined;
 let notice = "";
 let queuedSnapshots = 0;
@@ -85,6 +86,8 @@ table.on("columnResized", (column) => {
       return;
    }
    widths.set(field, width);
+   // Tabulator 重绘时会从列定义读取宽度，沿用用户刚调整的值。
+   column.getDefinition().width = width;
    vscode.postMessage({ type: "columnResized", column: index, width });
 });
 table.on("dataFiltered", (_filters, rows) => {
@@ -101,6 +104,7 @@ table.on("cellEditing", (cell) => {
 });
 table.on("cellEditCancelled", () => {
    editingCell = undefined;
+   updateTextWrapping();
    refreshControls();
 });
 table.on("cellEdited", (cell) => {
@@ -110,7 +114,22 @@ table.on("cellEdited", (cell) => {
    if (column !== undefined && !send({ kind: "cell", row, column, value: String(cell.getValue()) })) {
       cell.restoreOldValue();
    }
+   updateTextWrapping();
    refreshControls();
+});
+
+// Tabulator 会在键盘输入后调整高度。input 也覆盖粘贴、剪切和输入法更新。
+tableElement.addEventListener("input", ({ target }) => {
+   const cell = editingCell;
+   if (!cell || !(target instanceof HTMLTextAreaElement) || !cell.getElement().contains(target)) {
+      return;
+   }
+   const previousHeight = target.style.height;
+   target.style.height = "auto";
+   target.style.height = `${target.scrollHeight}px`;
+   if (target.style.height !== previousHeight) {
+      cell.getRow().normalizeHeight();
+   }
 });
 
 type MenuTarget =
@@ -178,6 +197,9 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
          } finally {
             queuedSnapshots--;
          }
+      } else if (data.type === "textWrapping") {
+         textWrapping = data.enabled;
+         updateTextWrapping();
       } else if (data.type === "editResult" && data.revision === pending) {
          pending = undefined;
          notice = data.error ?? "";
@@ -250,6 +272,28 @@ function asText(value: string): HTMLElement {
    const span = document.createElement("span");
    span.textContent = value;
    return span;
+}
+
+function updateTextWrapping(): void {
+   if (editingCell || tableElement.classList.contains("wrap-cell-text") === textWrapping) {
+      return;
+   }
+   tableElement.classList.toggle("wrap-cell-text", textWrapping);
+   if (!snapshot) {
+      return;
+   }
+
+   // 重新计算虚拟列表的行高，恢复切换前的首个可见行和横向滚动量。
+   const firstVisibleRow = table.getRows("visible")[0];
+   const viewport = tableElement.querySelector<HTMLElement>(".tabulator-tableholder");
+   const scrollLeft = viewport?.scrollLeft ?? 0;
+   table.redraw(true);
+   if (firstVisibleRow) {
+      void table.scrollToRow(firstVisibleRow, "top", true).catch(() => {});
+   }
+   if (viewport) {
+      viewport.scrollLeft = scrollLeft;
+   }
 }
 
 function selectRow(row: number | undefined): void {
@@ -375,7 +419,12 @@ function applyColumns(next: Snapshot): void {
          cssClass: "data-cell",
          variableHeight: true,
          editor: "textarea",
-         editorParams: () => ({ enterSubmit: true, shiftEnterNewLine: true, verticalNavigation: "editor" }),
+         editorParams: () => ({
+            enterSubmit: true,
+            shiftEnterNewLine: true,
+            verticalNavigation: "editor",
+            elementAttributes: { rows: "1", wrap: "soft" },
+         }),
          editable: () => !!snapshot && !snapshot.error && pending === undefined && !queuedSnapshots,
       };
    });
