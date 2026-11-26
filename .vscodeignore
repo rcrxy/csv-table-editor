@@ -1,5 +1,12 @@
 .vscode/**
 .vscode-test/**
+**/__tests__/**
+**/test/**
+**/tests/**
+**/fixtures/**
+**/coverage/**
+**/*.test.*
+**/*.spec.*
 out/**
 node_modules/**
 src/**
