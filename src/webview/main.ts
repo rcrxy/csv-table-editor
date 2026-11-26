@@ -3,6 +3,7 @@ import "tabulator-tables/dist/css/tabulator.min.css";
 import "./styles.css";
 import markup from "./body.html";
 import type { Direction, HostMessage, Operation, Snapshot, WebviewMessage } from "../shared/messages";
+import { measureInitialWidths } from "./columnWidths";
 import { GutterView } from "./GutterView";
 
 declare function acquireVsCodeApi(): { postMessage(message: WebviewMessage): void };
@@ -76,7 +77,16 @@ table.on("headerClick", (event, column) => {
       tableElement.focus({ preventScroll: true });
    }
 });
-table.on("columnResized", (column) => widths.set(column.getField(), column.getWidth()));
+table.on("columnResized", (column) => {
+   const field = column.getField();
+   const index = columnIndex(field);
+   const width = Math.round(column.getWidth());
+   if (index === undefined || !Number.isSafeInteger(width) || width <= 0) {
+      return;
+   }
+   widths.set(field, width);
+   vscode.postMessage({ type: "columnResized", column: index, width });
+});
 table.on("dataFiltered", (_filters, rows) => {
    if (selectedRow !== undefined && !rows.some((row) => Number(row.getIndex()) === selectedRow)) {
       selectRow(undefined);
@@ -156,6 +166,14 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
    updates = updates.then(async () => {
       if (data.type === "snapshot") {
          try {
+            if (data.savedColumnWidths) {
+               for (const [field, width] of Object.entries(data.savedColumnWidths)) {
+                  if (/^c\d+$/.test(field) && Number.isSafeInteger(width) && width > 0) {
+                     widths.set(field, width);
+                  }
+               }
+               renderedColumns = "";
+            }
             await render(data.snapshot);
          } finally {
             queuedSnapshots--;
@@ -314,10 +332,12 @@ function send(operation: Operation): boolean {
 // 表头或冻结范围变化时才重建列。重建时沿用列宽，并重新应用仍存在的列的排序和筛选值。
 function applyColumns(next: Snapshot): void {
    const headers = Array.from({ length: next.columnCount }, (_, index) => next.header?.values[index] ?? "");
-   const key = JSON.stringify([next.tableHeader, headers, frozenCount]);
+   const lineDigits = Math.max(4, String(next.records.at(-1)?.line ?? 0).length);
+   const key = JSON.stringify([next.tableHeader, headers, frozenCount, lineDigits]);
    if (key === renderedColumns) {
       return;
    }
+   measureInitialWidths(tableElement, next, widths);
    renderedColumns = key;
    const sorters = table
       .getSorters()
@@ -325,21 +345,23 @@ function applyColumns(next: Snapshot): void {
       .map(({ field, dir }) => ({ column: field, dir }));
    const filters = table.getHeaderFilters().filter(({ field }) => (columnIndex(field) ?? Infinity) < headers.length);
    // 最左侧冻结列显示源文件行号和 Git 标记，业务列使用 c0、c1 等内部字段名。
+   const lineWidth = gutter.measureWidth(lineDigits);
    const stub: ColumnDefinition = {
       title: "#",
       titleFormatter: () => (next.header ? gutter.header() : asText("#")),
       field: "_line",
       frozen: true,
-      width: 74,
+      width: lineWidth,
+      minWidth: lineWidth,
       headerSort: false,
       resizable: false,
       hozAlign: "right",
       cssClass: "gutter-cell",
       formatter: (cell) => gutter.record({ id: Number(cell.getRow().getIndex()), line: Number(cell.getValue()) }),
    };
-   // Tabulator 支持 maxInitialWidth，当前安装的类型声明尚未包含该属性。
-   const columns = headers.map<ColumnDefinition & { maxInitialWidth: number }>((name, index) => {
+   const columns: ColumnDefinition[] = headers.map((name, index) => {
       const field = `c${index}`;
+      const width = widths.get(field) ?? Math.min(80, next.cellMaxWidth);
       return {
          title: `Column ${index + 1}`,
          titleFormatter: () => asText(name || `Column ${index + 1}`),
@@ -347,9 +369,8 @@ function applyColumns(next: Snapshot): void {
          sorter: "string",
          headerSortTristate: true,
          frozen: index < frozenCount,
-         width: widths.get(field),
-         minWidth: Math.min(80, next.cellMaxWidth),
-         maxInitialWidth: next.cellMaxWidth,
+         width,
+         minWidth: Math.min(80, next.cellMaxWidth, width),
          formatter: (cell) => asText(String(cell.getValue() ?? "")),
          cssClass: "data-cell",
          variableHeight: true,

@@ -30,6 +30,7 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
 
 class DocumentController {
    private readonly delimiterKey: string;
+   private readonly columnWidthsKey: string;
    private readonly fallback: string;
    private readonly cellMaxWidth: number;
    private manualDelimiter: string | undefined;
@@ -48,6 +49,7 @@ class DocumentController {
       readonly panel: vscode.WebviewPanel,
    ) {
       this.delimiterKey = `delimiter:${document.uri.toString()}`;
+      this.columnWidthsKey = `columnWidths:${document.uri.toString()}`;
       this.fallback = document.uri.path.toLowerCase().endsWith(".tsv") ? "\t" : ",";
       const config = vscode.workspace.getConfiguration("csv-table-editor", document.uri);
       const width = Math.floor(config.get<number>("cellMaxCell", 400));
@@ -172,12 +174,20 @@ class DocumentController {
 
    private async receive(message: WebviewMessage): Promise<void> {
       if (message.type === "ready") {
-         this.sync();
+         if (this.document.version !== this.snapshot.version) {
+            this.updateSnapshot();
+         }
          this.ready = true;
-         this.post({ type: "snapshot", snapshot: this.snapshot });
+         this.post({
+            type: "snapshot",
+            snapshot: this.snapshot,
+            savedColumnWidths: this.context.workspaceState.get<Record<string, number>>(this.columnWidthsKey, {}),
+         });
          this.git.schedule();
       } else if (message.type === "delimiter") {
          await this.selectDelimiter();
+      } else if (message.type === "columnResized") {
+         await this.saveColumnWidth(message.column, message.width);
       } else {
          let error: string | undefined;
          if (this.editing) {
@@ -197,6 +207,20 @@ class DocumentController {
             this.post({ type: "snapshot", snapshot: this.snapshot });
          }
          this.post({ type: "editResult", revision: message.revision, error });
+      }
+   }
+
+   private async saveColumnWidth(column: number, width: number): Promise<void> {
+      if (this.disposed || column >= this.snapshot.columnCount) {
+         return;
+      }
+      const state = this.context.workspaceState;
+      const widths = state.get<Record<string, number>>(this.columnWidthsKey, {});
+      const field = `c${column}`;
+      try {
+         await state.update(this.columnWidthsKey, { ...widths, [field]: width });
+      } catch {
+         void vscode.window.showWarningMessage("Could not save the column width for this file.");
       }
    }
 
@@ -258,6 +282,16 @@ function isWebviewMessage(value: unknown): value is WebviewMessage {
    }
    if (value.type === "ready" || value.type === "delimiter") {
       return true;
+   }
+   if (value.type === "columnResized") {
+      return (
+         typeof value.column === "number" &&
+         Number.isSafeInteger(value.column) &&
+         value.column >= 0 &&
+         typeof value.width === "number" &&
+         Number.isSafeInteger(value.width) &&
+         value.width > 0
+      );
    }
    return (
       value.type === "edit" &&

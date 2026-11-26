@@ -13,6 +13,7 @@ export type Operation =
 export type WebviewMessage =
    | { type: "ready" }
    | { type: "delimiter" }
+   | { type: "columnResized"; column: number; width: number }
    | { type: "edit"; revision: number; version: number; operation: Operation };
 
 export interface TableRecord {
@@ -48,6 +49,6 @@ export interface Gutter {
 }
 
 export type HostMessage =
-   | { type: "snapshot"; snapshot: Snapshot }
+   | { type: "snapshot"; snapshot: Snapshot; savedColumnWidths?: Record<string, number> }
    | { type: "editResult"; revision: number; error?: string }
    | { type: "gutter"; revision: number; gutter?: Gutter };

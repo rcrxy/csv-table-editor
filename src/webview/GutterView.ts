@@ -19,6 +19,20 @@ export class GutterView {
       private readonly reveal: (row: number | null, line: number) => void,
    ) {}
 
+   measureWidth(digits: number): number {
+      const sample = document.createElement("span");
+      sample.className = "record-gutter";
+      sample.style.position = "absolute";
+      sample.style.visibility = "hidden";
+      sample.style.boxSizing = "content-box";
+      sample.style.width = `${digits}ch`;
+      this.tableElement.append(sample);
+      const width = Math.ceil(sample.getBoundingClientRect().width);
+      sample.remove();
+      // 测量结果包含行号的留白，再计入单元格右侧边框。
+      return width > 0 ? width + 1 : digits * 8 + 15;
+   }
+
    record(record: Pick<TableRecord, "id" | "line">): HTMLElement {
       const element = document.createElement("span");
       element.className = "record-gutter";
