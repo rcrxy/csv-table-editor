@@ -212,7 +212,6 @@ button:focus-visible,
 
 .record-gutter,
 #end-markers {
-   position: relative;
    display: block;
    box-sizing: border-box;
    min-height: 21px;
@@ -223,7 +222,14 @@ button:focus-visible,
    text-align: right;
 }
 
+/* 表头和数据行的 Git 状态条以整个序列号单元格为定位基准。 */
+.tabulator .tabulator-header .tabulator-col.gutter-cell .tabulator-col-content,
+.tabulator .tabulator-header .tabulator-col.gutter-cell .tabulator-col-title-holder {
+   position: static;
+}
+
 #end-markers {
+   position: relative;
    padding-left: 12px;
    border-top: 1px solid var(--table-line);
    color: var(--vscode-descriptionForeground);
@@ -239,7 +245,11 @@ button:focus-visible,
    width: 3px;
 }
 
-.gutter-strip.deleted {
+.gutter-cell .gutter-strip + .gutter-strip {
+   left: 3px;
+}
+
+#end-markers .gutter-strip.deleted {
    height: 3px;
    width: 9px;
 }
