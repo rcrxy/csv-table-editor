@@ -9,6 +9,8 @@ const structureMenuCommands = [
    "insertColumnRight",
    "deleteRow",
    "deleteColumn",
+   "freezeCell",
+   "unfreezeCell",
 ] as const;
 
 export function activate(context: vscode.ExtensionContext): void {

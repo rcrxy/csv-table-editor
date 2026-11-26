@@ -1,4 +1,4 @@
-import { TabulatorFull as Tabulator, type CellComponent, type ColumnDefinition } from "tabulator-tables";
+import { TabulatorFull as Tabulator, type CellComponent, type ColumnDefinition, type RowComponent } from "tabulator-tables";
 import "tabulator-tables/dist/css/tabulator.min.css";
 import "./styles.css";
 import markup from "./body.html";
@@ -32,7 +32,8 @@ let selectionAfterEdit: { row: number; column: number } | undefined;
 let selectedRow: number | undefined;
 let selectedColumn: number | undefined;
 let selectedCell: { row: number; column: number } | undefined;
-let frozenCount = 0;
+let frozenRowCount = 0;
+let frozenColumnCount = 0;
 let renderedColumns = "";
 let textWrapping = false;
 let editingCell: CellComponent | undefined;
@@ -71,6 +72,11 @@ const gutter = new GutterView(
       } else if (row === null) {
          document.getElementById("end-markers")!.scrollIntoView({ block: "nearest" });
       } else {
+         const target = table.getRow(row);
+         if (target && target.isFrozen()) {
+            selectRow(row);
+            return;
+         }
          void table.scrollToRow(row, "center").then(
             () => selectRow(row),
             () => {
@@ -136,11 +142,14 @@ table.on("cellEditing", (cell) => {
    }
    refreshControls();
 });
-table.on("cellEditCancelled", () => {
+table.on("cellEditCancelled", (cell) => {
    const restoreFocus = keyboardMode === "editing" && !editorBlurring;
    editingCell = undefined;
    composing = false;
    updateTextWrapping();
+   if (cell.getRow().isFrozen()) {
+      table.redraw();
+   }
    // Tabulator 会移除输入框。等浏览器处理完焦点切换，再决定是否接回焦点。
    queueMicrotask(() => {
       if (editingCell) {
@@ -222,7 +231,11 @@ function resizeCellEditor(input: HTMLTextAreaElement, cell: CellComponent): void
    input.style.height = "auto";
    input.style.height = `${input.scrollHeight}px`;
    if (input.style.height !== previousHeight) {
-      cell.getRow().normalizeHeight();
+      const row = cell.getRow();
+      row.normalizeHeight();
+      if (row.isFrozen()) {
+         table.redraw();
+      }
    }
 }
 
@@ -233,7 +246,7 @@ type MenuTarget =
 
 // 菜单定位使用源记录 ID。无表头时，删除列的入口取当前视图的第一行。
 function menuStructureOperation(
-   command: StructureMenuCommand,
+   command: Exclude<StructureMenuCommand, "freezeCell" | "unfreezeCell">,
    field: string | undefined,
    rowId: number | undefined,
 ): Operation | undefined {
@@ -266,10 +279,28 @@ function menuStructureOperation(
    if (snapshot.columnCount < 2) {
       return;
    }
-   const row = rowId !== undefined && !snapshot.tableHeader && table.getRow(rowId);
-   if ((rowId === undefined && snapshot.header) || (row && row.getPosition() === 1)) {
+   const firstDataRow = !snapshot.tableHeader && rowId !== undefined && table.getRows("active")[0]?.getIndex() === rowId;
+   if ((rowId === undefined && snapshot.header) || firstDataRow) {
       return { kind: "deleteColumn", column };
    }
+}
+
+function freezePaneTarget(field: string | undefined, rowId: number | undefined): { rows: number; columns: number } | undefined {
+   const column = field === undefined ? undefined : columnIndex(field);
+   if (
+      !snapshot ||
+      snapshot.error ||
+      rowId === undefined ||
+      !dataRecord(snapshot, rowId) ||
+      column === undefined ||
+      !Number.isInteger(column) ||
+      column < 0 ||
+      column >= snapshot.columnCount
+   ) {
+      return;
+   }
+   const rows = rowId - (snapshot.tableHeader ? 1 : 0);
+   return rows || column ? { rows, columns: column } : undefined;
 }
 
 function setMenuTarget(element: HTMLElement, target: MenuTarget): void {
@@ -280,7 +311,8 @@ function setMenuTarget(element: HTMLElement, target: MenuTarget): void {
       revision: snapshot?.revision,
       version: snapshot?.version,
       tableResource: snapshot?.resource,
-      hasFrozenColumns: frozenCount > 0,
+      canFreezePanes: target.webviewSection === "cell" && !!freezePaneTarget(field, rowId),
+      hasFrozenPanes: frozenRowCount > 0 || frozenColumnCount > 0,
       canDeleteTableRow: !!menuStructureOperation("deleteRow", field, rowId),
       canDeleteTableColumn: !!menuStructureOperation("deleteColumn", field, rowId),
    });
@@ -374,14 +406,6 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
 // addColumn.onclick = () => send({ kind: "addColumn" });
 // deleteColumn.onclick = () => selectedColumn !== undefined && send({ kind: "deleteColumn", column: selectedColumn });
 // rename.onclick = () => selectedColumn !== undefined && send({ kind: "rename", column: selectedColumn });
-// freeze.onclick = () => {
-//    if (snapshot) {
-//       const count = selectedColumn === undefined ? 0 : selectedColumn + 1;
-//       frozenCount = frozenCount === count ? 0 : count;
-//       applyColumns(snapshot);
-//       refreshControls();
-//    }
-// };
 // reset.onclick = () => {
 //    table.clearFilter(true);
 //    refreshControls();
@@ -441,7 +465,16 @@ function runTableAction(action: TableAction): void {
    if (action.kind === "editStructureFromMenu") {
       const { field, rowId, revision, version } = action.target;
       if (snapshot?.revision === revision && snapshot.version === version) {
-         send(menuStructureOperation(action.command, field, rowId));
+         if (action.command === "freezeCell") {
+            const target = freezePaneTarget(field, rowId);
+            if (target) {
+               setFrozenPanes(target.rows, target.columns);
+            }
+         } else if (action.command === "unfreezeCell") {
+            setFrozenPanes(0, 0);
+         } else {
+            send(menuStructureOperation(action.command, field, rowId));
+         }
       }
       return;
    }
@@ -495,7 +528,7 @@ function submitCellEdit(save: boolean, moveToNextRow = false): void {
    const currentRow = cell.getRow();
    const row = Number(currentRow.getIndex());
    // 按提交前的表格顺序定位下一行，避免提交后筛选结果变化导致跳行。
-   const nextRow = moveToNextRow && currentRow.getNextRow();
+   const nextRow = moveToNextRow && adjacentRow(currentRow, 1);
    const nextSelection = nextRow ? { row: Number(nextRow.getIndex()), column } : undefined;
    const value = input.value;
    const original = String(cell.getValue() ?? "").replace(/\r\n?/g, "\n");
@@ -614,7 +647,7 @@ function moveCellSelection(vertical: boolean, direction: Direction): void {
       return;
    }
    const row = current.getRow();
-   const nextRow = selectedCell && vertical ? (direction < 0 ? row.getPrevRow() : row.getNextRow()) : row;
+   const nextRow = selectedCell && vertical ? adjacentRow(row, direction) : row;
    const nextColumn = selectedCell && !vertical ? column + direction : column;
    if (!nextRow) {
       return;
@@ -622,12 +655,30 @@ function moveCellSelection(vertical: boolean, direction: Direction): void {
    selectAndRevealCell(Number(nextRow.getIndex()), nextColumn);
 }
 
+function adjacentRow(row: RowComponent, direction: Direction): RowComponent | false {
+   if (!row.isFrozen()) {
+      const next = direction < 0 ? row.getPrevRow() : row.getNextRow();
+      if (next || direction > 0 || frozenRowCount === 0) {
+         return next;
+      }
+   }
+   // Tabulator 将冻结行移出滚动区域的行序列，跨越冻结边界时按活动记录顺序查找。
+   const rows = table.getRows("active");
+   const index = rows.findIndex((candidate) => candidate.getIndex() === row.getIndex());
+   return index < 0 ? false : (rows[index + direction] ?? false);
+}
+
 function selectAndRevealCell(row: number, column: number): void {
    const destination = cellAt(row, column);
-   if (destination && destination.getRow().getPosition() !== false) {
+   const target = destination?.getRow();
+   if (destination && target && (target.isFrozen() || target.getPosition() !== false)) {
       selectCell(row, column);
-      void table.scrollToRow(destination.getRow(), "nearest", false).catch(() => {});
-      void table.scrollToColumn(destination.getField(), "middle", false).catch(() => {});
+      if (!target.isFrozen()) {
+         void table.scrollToRow(target, "nearest", false).catch(() => {});
+      }
+      if (column >= frozenColumnCount) {
+         void table.scrollToColumn(destination.getField(), "middle", false).catch(() => {});
+      }
    }
 }
 
@@ -652,13 +703,18 @@ function moveSelection(vertical: boolean, direction: Direction): void {
       const next = row + direction;
       if (dataRecord(snapshot, next) && send({ kind: "moveRow", row, direction })) {
          selectCell(next, column);
-         void table.scrollToRow(next, "nearest", false).catch(() => {});
+         const target = table.getRow(next);
+         if (target && !target.isFrozen()) {
+            void table.scrollToRow(target, "nearest", false).catch(() => {});
+         }
       }
    } else {
       const next = column + direction;
       if (next >= 0 && next < snapshot.columnCount && send({ kind: "moveColumn", column, direction })) {
          selectCell(row, next);
-         void table.scrollToColumn(`c${next}`, "middle", false).catch(() => {});
+         if (next >= frozenColumnCount) {
+            void table.scrollToColumn(`c${next}`, "middle", false).catch(() => {});
+         }
       }
    }
 }
@@ -676,11 +732,48 @@ function send(operation: Operation | undefined, save = false): boolean {
    return true;
 }
 
+function setFrozenPanes(rows: number, columns: number): void {
+   if (!snapshot || snapshot.error || pending !== undefined || queuedSnapshots || editingCell) {
+      return;
+   }
+   const rowsChanged = rows !== frozenRowCount;
+   const columnsChanged = columns !== frozenColumnCount;
+   frozenRowCount = rows;
+   frozenColumnCount = columns;
+   if (columnsChanged) {
+      applyColumns(snapshot);
+   }
+   if (rowsChanged) {
+      applyFrozenRows();
+   }
+   refreshControls();
+}
+
+function applyFrozenRows(): void {
+   const boundary = (snapshot?.tableHeader ? 1 : 0) + frozenRowCount;
+   const changes = table.getRows().filter((row) => row.isFrozen() !== (Number(row.getIndex()) < boundary));
+   if (!changes.length) {
+      return;
+   }
+   table.blockRedraw();
+   try {
+      for (const row of changes) {
+         if (Number(row.getIndex()) < boundary) {
+            row.freeze();
+         } else {
+            row.unfreeze();
+         }
+      }
+   } finally {
+      table.restoreRedraw();
+   }
+}
+
 // 列结构变化时重建列，沿用列宽与仍存在的列的筛选值。
 function applyColumns(next: Snapshot): void {
    const headers = Array.from({ length: next.columnCount }, (_, index) => next.header?.values[index] ?? "");
    const lineDigits = next.showRowNumbers ? Math.max(4, String(next.records.at(-1)?.line ?? 0).length) : undefined;
-   const key = JSON.stringify([next.tableHeader, headers, frozenCount, lineDigits]);
+   const key = JSON.stringify([next.tableHeader, headers, frozenColumnCount, lineDigits]);
    if (key === renderedColumns) {
       return;
    }
@@ -694,7 +787,7 @@ function applyColumns(next: Snapshot): void {
          title: `Column ${index + 1}`,
          titleFormatter: () => asText(name || `Column ${index + 1}`),
          field,
-         frozen: index < frozenCount,
+         frozen: index < frozenColumnCount,
          width,
          minWidth: Math.min(80, next.cellMaxWidth, width),
          formatter: (cell) => {
@@ -778,7 +871,8 @@ async function render(next: Snapshot): Promise<void> {
    if (selectedColumn !== undefined && selectedColumn >= next.columnCount) {
       selectColumn(undefined);
    }
-   frozenCount = Math.min(frozenCount, next.columnCount);
+   frozenRowCount = Math.min(frozenRowCount, next.records.length);
+   frozenColumnCount = next.records.length ? Math.min(frozenColumnCount, next.columnCount) : 0;
    applyColumns(next);
    const data = next.records.map(({ id, line, values }) => {
       const row: Record<string, number | string> = { id, _line: line };
@@ -787,7 +881,18 @@ async function render(next: Snapshot): Promise<void> {
       }
       return row;
    });
+   const viewport = tableElement.querySelector<HTMLElement>(".tabulator-tableholder");
+   const scrollTop = viewport?.scrollTop ?? 0;
+   const scrollLeft = viewport?.scrollLeft ?? 0;
    await table.replaceData(data);
+   // 替换数据会重建行组件，按冻结边界恢复固定行及原来的滚动位置。
+   if (frozenRowCount > 0) {
+      applyFrozenRows();
+      if (viewport) {
+         viewport.scrollTop = scrollTop;
+         viewport.scrollLeft = scrollLeft;
+      }
+   }
 }
 
 // 集中更新状态栏，也保留了原工具栏的启用条件供改版时参考。
@@ -801,9 +906,6 @@ function refreshControls(): void {
    // addColumn.disabled = !editable;
    // deleteColumn.disabled = !editable || selectedColumn === undefined || (snapshot?.columnCount ?? 0) < 2;
    // rename.disabled = !editable || selectedColumn === undefined;
-   // freeze.disabled = !editable || (selectedColumn === undefined && frozenCount === 0);
-   const unfreeze = frozenCount > 0 && (selectedColumn === undefined || frozenCount === selectedColumn + 1);
-   // freeze.textContent = unfreeze ? "Unfreeze columns" : "Freeze through column";
    // reset.disabled = !snapshot || busy || !hasHeaderFilters();
    if (!snapshot) {
       return;

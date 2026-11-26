@@ -85,7 +85,9 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
       }
       if (
          (command === "deleteRow" && context.canDeleteTableRow !== true) ||
-         (command === "deleteColumn" && context.canDeleteTableColumn !== true)
+         (command === "deleteColumn" && context.canDeleteTableColumn !== true) ||
+         (command === "freezeCell" && context.canFreezePanes !== true) ||
+         (command === "unfreezeCell" && context.hasFrozenPanes !== true)
       ) {
          return;
       }

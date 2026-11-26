@@ -8,7 +8,9 @@ export type StructureMenuCommand =
    | "insertColumnLeft"
    | "insertColumnRight"
    | "deleteRow"
-   | "deleteColumn";
+   | "deleteColumn"
+   | "freezeCell"
+   | "unfreezeCell";
 
 export type TableAction =
    | { kind: "moveCellSelection" | "moveTableStructure"; direction: TableDirection }

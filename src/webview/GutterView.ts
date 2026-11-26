@@ -32,6 +32,7 @@ export class GutterView {
    attachScrollTrack(): void {
       const viewport = this.tableElement.querySelector<HTMLElement>(".tabulator-tableholder");
       const content = viewport?.querySelector<HTMLElement>(".tabulator-table");
+      const frozenRows = this.tableElement.querySelector<HTMLElement>(".tabulator-frozen-rows-holder");
       if (!viewport || !content) {
          return;
       }
@@ -41,7 +42,7 @@ export class GutterView {
          if (frame === undefined) {
             frame = requestAnimationFrame(() => {
                frame = undefined;
-               this.layoutScrollTrack(viewport, content);
+               this.layoutScrollTrack(viewport, content, frozenRows);
             });
          }
       };
@@ -58,29 +59,43 @@ export class GutterView {
       const observer = new ResizeObserver(schedule);
       observer.observe(viewport);
       observer.observe(content);
+      if (frozenRows) {
+         observer.observe(frozenRows);
+      }
       updateDisplayPositions();
    }
 
-   private layoutScrollTrack(viewport: HTMLElement, content: HTMLElement): void {
+   private layoutScrollTrack(viewport: HTMLElement, content: HTMLElement, frozenRows: HTMLElement | null): void {
       const trackHeight = viewport.clientHeight;
-      const contentHeight = content.offsetHeight;
+      const frozenHeight = frozenRows?.offsetHeight ?? 0;
+      const scrollingHeight = content.offsetHeight;
+      const contentHeight = frozenHeight + scrollingHeight;
       const positions = new Map<number, RenderedRowPosition>();
-      for (const element of content.children) {
-         if (!(element instanceof HTMLElement) || element.dataset.recordId === undefined) {
+      // 冻结行位于表头容器内，概览仍按完整的记录顺序绘制。
+      for (const container of [frozenRows, content]) {
+         if (!container) {
             continue;
          }
-         const id = Number(element.dataset.recordId);
-         const index = this.displayPositions.get(id);
-         if (index !== undefined) {
-            const top = element.offsetTop;
-            positions.set(id, { index, top, bottom: top + element.offsetHeight });
+         const origin = container.getBoundingClientRect().top;
+         const offset = container === frozenRows ? 0 : frozenHeight;
+         for (const element of container.children) {
+            if (!(element instanceof HTMLElement) || element.dataset.recordId === undefined) {
+               continue;
+            }
+            const id = Number(element.dataset.recordId);
+            const index = this.displayPositions.get(id);
+            if (index !== undefined) {
+               const rect = element.getBoundingClientRect();
+               const top = offset + rect.top - origin;
+               positions.set(id, { index, top, bottom: top + rect.height });
+            }
          }
       }
       const rendered = [...positions.values()];
       const first = rendered[0];
       const last = rendered.at(-1);
       // 短表在底部多留一行滚动空间，计算标记时仍以可见轨道高度为基准。
-      if (first && contentHeight <= trackHeight) {
+      if (first && scrollingHeight > 0 && scrollingHeight <= trackHeight) {
          viewport.style.setProperty("--table-scroll-end", `${trackHeight + first.bottom - first.top}px`);
       } else {
          viewport.style.removeProperty("--table-scroll-end");
@@ -92,7 +107,7 @@ export class GutterView {
       this.overview.style.height = `${trackHeight}px`;
 
       const rowCount = this.displayPositions.size;
-      const scaleHeight = Math.max(1, trackHeight, contentHeight);
+      const scaleHeight = Math.max(1, trackHeight + frozenHeight, contentHeight);
       for (const { row, button } of this.overviewMarkers) {
          let offset = 0;
          if (row === null) {

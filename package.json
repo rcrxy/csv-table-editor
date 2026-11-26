@@ -230,12 +230,12 @@
                 },
                 {
                     "command": "csv-table-editor.freezeCell",
-                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell'",
+                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell' && canFreezePanes",
                     "group": "3_freeze@1"
                 },
                 {
                     "command": "csv-table-editor.unfreezeCell",
-                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell' && hasFrozenColumns",
+                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell' && hasFrozenPanes",
                     "group": "3_freeze@2"
                 },
                 {
