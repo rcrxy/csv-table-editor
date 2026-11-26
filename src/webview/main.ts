@@ -8,11 +8,13 @@ import { GutterView } from "./GutterView";
 declare function acquireVsCodeApi(): { postMessage(message: WebviewMessage): void };
 
 const vscode = acquireVsCodeApi();
+// esbuild 将 body.html 打进 Webview 脚本，重载 Webview 时会重新挂载这份模板。
 document.body.insertAdjacentHTML("afterbegin", markup);
 const tableElement = document.getElementById("table")!;
 const statusElement = document.getElementById("status")!;
 const widths = new Map<string, number>();
 
+// 文档快照来自扩展宿主，行列选择、列宽和冻结范围属于当前视图。
 let snapshot: Snapshot | undefined;
 let pending: number | undefined;
 let selectedRow: number | undefined;
@@ -33,6 +35,7 @@ const table = new Tabulator(tableElement, {
    placeholder: "No data records",
    rowFormatter: (row) => row.getElement().classList.toggle("selected-record", Number(row.getIndex()) === selectedRow),
 });
+// 从概览尺定位到记录。表头和文件末尾没有对应的数据行。
 const gutter = new GutterView(
    table,
    tableElement,
@@ -55,6 +58,7 @@ const gutter = new GutterView(
    },
 );
 
+// 首次打开或重载后，等表格就绪再向宿主请求文档快照。
 table.on("tableBuilt", () => vscode.postMessage({ type: "ready" }));
 table.on("cellClick", (event, cell) => {
    const index = columnIndex(cell.getField());
@@ -99,6 +103,7 @@ table.on("cellEdited", (cell) => {
    refreshControls();
 });
 
+// 快照渲染可能异步完成，按消息顺序处理，并丢弃不属于当前快照的 Git 标记。
 window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
    if (!data || typeof data !== "object") {
       return;
@@ -133,6 +138,7 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
    });
 });
 
+// 原工具栏事件绑定，改版时可将这组操作接到新控件。
 // delimiterButton.onclick = () => vscode.postMessage({ type: "delimiter" });
 // addRow.onclick = () => send({ kind: "addRow" });
 // deleteRow.onclick = () => selectedRow !== undefined && send({ kind: "deleteRow", row: selectedRow });
@@ -153,6 +159,7 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
 //    refreshControls();
 // };
 
+// Alt+Shift+方向键移动源文件中的行列，输入框内保留按键原有行为。
 tableElement.addEventListener("keydown", (event) => {
    if (
       !event.altKey ||
@@ -180,6 +187,7 @@ function columnIndex(field: string): number | undefined {
    return field.startsWith("c") ? Number(field.slice(1)) : undefined;
 }
 
+// 表头和单元格可包含任意文件内容，统一按纯文本渲染。
 function asText(value: string): HTMLElement {
    const span = document.createElement("span");
    span.textContent = value;
@@ -224,6 +232,7 @@ function hasViewOrder(): boolean {
    return table.getSorters().length > 0 || table.getHeaderFilters().length > 0;
 }
 
+// 行移动依赖源文件顺序，排序或筛选生效时暂停行移动。
 function moveSelection(vertical: boolean, direction: Direction): void {
    if (!snapshot) {
       return;
@@ -246,6 +255,7 @@ function moveSelection(vertical: boolean, direction: Direction): void {
    }
 }
 
+// 数据修改携带当前快照和文档版本，由扩展宿主应用到 TextDocument。
 function send(operation: Operation): boolean {
    if (!snapshot || snapshot.error || pending !== undefined || queuedSnapshots || editingCell) {
       return false;
@@ -257,6 +267,7 @@ function send(operation: Operation): boolean {
    return true;
 }
 
+// 表头或冻结范围变化时才重建列。重建时沿用列宽，并重新应用仍存在的列的排序和筛选值。
 function applyColumns(next: Snapshot): void {
    const headers = Array.from({ length: next.columnCount }, (_, index) => next.header?.values[index] ?? "");
    const key = JSON.stringify([headers, frozenCount]);
@@ -264,10 +275,12 @@ function applyColumns(next: Snapshot): void {
       return;
    }
    renderedColumns = key;
-   const sorters = table.getSorters()
+   const sorters = table
+      .getSorters()
       .filter(({ field }) => (columnIndex(field) ?? Infinity) < headers.length)
       .map(({ field, dir }) => ({ column: field, dir }));
    const filters = table.getHeaderFilters().filter(({ field }) => (columnIndex(field) ?? Infinity) < headers.length);
+   // 最左侧冻结列显示源文件行号和 Git 标记，业务列使用 c0、c1 等内部字段名。
    const stub: ColumnDefinition = {
       title: "#",
       titleFormatter: () => gutter.header(),
@@ -311,6 +324,7 @@ function applyColumns(next: Snapshot): void {
    selectColumn(selectedColumn);
 }
 
+// 将宿主快照转换为 Tabulator 数据，编辑和定位使用原始记录 ID。
 async function render(next: Snapshot): Promise<void> {
    if (snapshot && next.revision < snapshot.revision) {
       return;
@@ -346,6 +360,7 @@ async function render(next: Snapshot): Promise<void> {
    await table.replaceData(data);
 }
 
+// 集中更新状态栏，也保留了原工具栏的启用条件供改版时参考。
 function refreshControls(): void {
    const busy = pending !== undefined || queuedSnapshots > 0 || editingCell !== undefined;
    const editable = !!snapshot && !snapshot.error && !busy;

@@ -8,6 +8,7 @@ const statusNames: Record<GitStatus, string> = {
 };
 
 export class GutterView {
+   // 按当前快照的记录 ID 保存标记。0 是表头，null 是文件末尾的删除边界。
    private markers = new Map<number | null, GitMarker[]>();
 
    constructor(
@@ -47,6 +48,7 @@ export class GutterView {
          button.type = "button";
          button.title = `${statusNames[marker.status]} · line ${marker.line}`;
          button.setAttribute("aria-label", button.title);
+         // 概览尺使用源文件行号，位置与表格当前的排序和筛选无关。
          button.style.top = `${((marker.line - 0.5) / lineCount) * 100}%`;
          button.addEventListener("click", () => this.reveal(marker.row, marker.line));
          overview.append(button);
@@ -58,6 +60,7 @@ export class GutterView {
       if (header) {
          this.paint(header, 0, "#", "Header record");
       }
+      // 更新新旧标记涉及的行，清除旧标记。尚未渲染的行会在格式化时读取当前标记。
       for (const id of new Set([...previous.keys(), ...this.markers.keys()])) {
          if (id === 0 || id === null) {
             continue;

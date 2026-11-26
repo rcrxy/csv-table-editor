@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
 
+// 宿主提供 Webview 外壳和本地资源入口。界面结构在 src/webview/body.html。
 export function configureWebview(webview: vscode.Webview, extensionUri: vscode.Uri): void {
    const dist = vscode.Uri.joinPath(extensionUri, "dist");
    const script = webview.asWebviewUri(vscode.Uri.joinPath(dist, "webview.js"));
