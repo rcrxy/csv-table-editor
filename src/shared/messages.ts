@@ -1,5 +1,13 @@
 export type Direction = -1 | 1;
 
+export type TableDirection = "up" | "down" | "left" | "right";
+export type KeyboardMode = "inactive" | "grid" | "editing";
+
+export type TableAction =
+   | { kind: "moveCellSelection" | "moveTableStructure"; direction: TableDirection }
+   | { kind: "editCell"; target?: { row: number; column: number; revision: number; version: number } }
+   | { kind: "submitCellEdit"; save: boolean };
+
 export type Operation =
    | { kind: "cell"; row: number; column: number; value: string }
    | { kind: "rename"; column: number }
@@ -13,8 +21,10 @@ export type Operation =
 export type WebviewMessage =
    | { type: "ready" }
    | { type: "delimiter" }
+   | { type: "keyboardMode"; mode: KeyboardMode; hasSelectedCell: boolean }
    | { type: "columnResized"; column: number; width: number }
-   | { type: "edit"; revision: number; version: number; operation: Operation };
+   | { type: "save"; revision: number; version: number }
+   | { type: "edit"; revision: number; version: number; operation: Operation; save?: boolean };
 
 export interface TableRecord {
    id: number;
@@ -51,5 +61,6 @@ export interface Gutter {
 export type HostMessage =
    | { type: "snapshot"; snapshot: Snapshot; savedColumnWidths?: Record<string, number> }
    | { type: "textWrapping"; enabled: boolean }
+   | { type: "tableAction"; action: TableAction }
    | { type: "editResult"; revision: number; error?: string }
    | { type: "gutter"; revision: number; gutter?: Gutter };

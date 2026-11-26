@@ -40,6 +40,22 @@
                 "enablement": "true"
             },
             {
+                "command": "csv-table-editor.moveCellSelection",
+                "title": "%command.moveCellSelection%"
+            },
+            {
+                "command": "csv-table-editor.moveColumnLeft",
+                "title": "%command.moveColumnLeft%"
+            },
+            {
+                "command": "csv-table-editor.moveColumnRight",
+                "title": "%command.moveColumnRight%"
+            },
+            {
+                "command": "csv-table-editor.submitCellEdit",
+                "title": "%command.submitCellEdit%"
+            },
+            {
                 "title": "%command.clearCell%",
                 "command": "csv-table-editor.clearCell",
                 "enablement": "true"
@@ -100,6 +116,68 @@
                 "enablement": "true"
             }
         ],
+        "keybindings": [
+            {
+                "command": "csv-table-editor.moveCellSelection",
+                "key": "up",
+                "args": "up",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
+            },
+            {
+                "command": "csv-table-editor.moveCellSelection",
+                "key": "down",
+                "args": "down",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
+            },
+            {
+                "command": "csv-table-editor.moveCellSelection",
+                "key": "left",
+                "args": "left",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
+            },
+            {
+                "command": "csv-table-editor.moveCellSelection",
+                "key": "right",
+                "args": "right",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
+            },
+            {
+                "command": "csv-table-editor.editCell",
+                "key": "enter",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
+            },
+            {
+                "command": "csv-table-editor.submitCellEdit",
+                "key": "enter",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
+            },
+            {
+                "command": "csv-table-editor.submitCellEdit",
+                "key": "ctrl+enter",
+                "args": true,
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
+            },
+            {
+                "command": "editor.action.moveLinesUpAction",
+                "key": "alt+up",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.canMoveTableStructure"
+            },
+            {
+                "command": "editor.action.moveLinesDownAction",
+                "key": "alt+down",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.canMoveTableStructure"
+            },
+            {
+                "command": "csv-table-editor.moveColumnLeft",
+                "key": "alt+left",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.canMoveTableStructure"
+            },
+            {
+                "command": "csv-table-editor.moveColumnRight",
+                "key": "alt+right",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.canMoveTableStructure"
+            }
+        ],
         "menus": {
             "editor/title": [
                 {
@@ -111,6 +189,10 @@
             "commandPalette": [
                 { "command": "csv-table-editor.toggleTextWrapping", "when": "false" },
                 { "command": "csv-table-editor.editCell", "when": "false" },
+                { "command": "csv-table-editor.moveCellSelection", "when": "false" },
+                { "command": "csv-table-editor.moveColumnLeft", "when": "false" },
+                { "command": "csv-table-editor.moveColumnRight", "when": "false" },
+                { "command": "csv-table-editor.submitCellEdit", "when": "false" },
                 { "command": "csv-table-editor.clearCell", "when": "false" },
                 { "command": "csv-table-editor.clearFilter", "when": "false" },
                 { "command": "csv-table-editor.resetAllFilters", "when": "false" },

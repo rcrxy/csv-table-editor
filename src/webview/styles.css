@@ -191,6 +191,13 @@ button:focus-visible,
    color: var(--vscode-list-inactiveSelectionForeground, var(--vscode-editor-foreground));
 }
 
+.tabulator .tabulator-row .tabulator-cell.selected-cell:not(.tabulator-editing) {
+   background: var(--vscode-list-activeSelectionBackground);
+   color: var(--vscode-list-activeSelectionForeground, var(--vscode-editor-foreground));
+   outline: 1px solid var(--vscode-focusBorder);
+   outline-offset: -1px;
+}
+
 .tabulator .tabulator-tableholder .tabulator-placeholder .tabulator-placeholder-contents {
    color: var(--vscode-descriptionForeground);
    font-size: inherit;

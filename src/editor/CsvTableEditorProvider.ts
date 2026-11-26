@@ -2,20 +2,108 @@ import * as vscode from "vscode";
 import { delimiters, delimiterError, detectDelimiter, parseDocument, type ParsedDocument } from "../core/CsvParser";
 import { documentEdits } from "../core/DocumentEdits";
 import { GitGutter } from "../git/GitGutter";
-import type { HostMessage, Operation, Snapshot, WebviewMessage } from "../shared/messages";
+import type { HostMessage, KeyboardMode, Operation, Snapshot, TableAction, WebviewMessage } from "../shared/messages";
 import { configureWebview } from "./webview";
 
 export const viewType = "csv-table-editor.table";
 
+const nativeMoveLineCommands = [
+   ["editor.action.moveLinesUpAction", "up"],
+   ["editor.action.moveLinesDownAction", "down"],
+] as const;
+
 export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
    private readonly sessions = new Set<DocumentController>();
+   private keyboardMode: KeyboardMode = "inactive";
+   private canMoveTableStructure = false;
+   private moveLineHandlers: vscode.Disposable | undefined;
 
    constructor(private readonly context: vscode.ExtensionContext) {}
 
+   dispose(): void {
+      this.moveLineHandlers?.dispose();
+   }
+
    resolveCustomTextEditor(document: vscode.TextDocument, panel: vscode.WebviewPanel): void {
-      const session = new DocumentController(this.context, document, panel);
+      const session = new DocumentController(this.context, document, panel, () => this.updateKeyboardContext());
       this.sessions.add(session);
-      panel.onDidDispose(() => this.sessions.delete(session));
+      panel.onDidChangeViewState(() => this.updateKeyboardContext());
+      panel.onDidDispose(() => {
+         this.sessions.delete(session);
+         this.updateKeyboardContext();
+      });
+      this.updateKeyboardContext();
+   }
+
+   runTableAction(action: TableAction): void {
+      const session = this.activeSession();
+      if (session && (action.kind !== "moveTableStructure" || session.canMoveTableStructure)) {
+         session.runTableAction(action);
+      }
+   }
+
+   editCell(context: unknown): void {
+      if (context === undefined) {
+         this.runTableAction({ kind: "editCell" });
+         return;
+      }
+      if (
+         !isRecord(context) ||
+         context.webview !== viewType ||
+         context.webviewSection !== "cell" ||
+         typeof context.field !== "string" ||
+         !/^c\d+$/.test(context.field)
+      ) {
+         return;
+      }
+      const { rowId, revision, version } = context;
+      if (typeof rowId === "number" && typeof revision === "number" && typeof version === "number") {
+         this.runTableAction({
+            kind: "editCell",
+            target: { row: rowId, column: Number(context.field.slice(1)), revision, version },
+         });
+      }
+   }
+
+   private activeSession(): DocumentController | undefined {
+      return [...this.sessions].find(({ panel }) => panel.active);
+   }
+
+   private updateKeyboardContext(): void {
+      const session = this.activeSession();
+      const mode = session?.keyboardMode ?? "inactive";
+      if (mode !== this.keyboardMode) {
+         this.keyboardMode = mode;
+         void vscode.commands.executeCommand("setContext", "csvTableEditor.keyboardMode", mode);
+      }
+      const canMove = session?.canMoveTableStructure ?? false;
+      if (canMove === this.canMoveTableStructure) {
+         return;
+      }
+      this.canMoveTableStructure = canMove;
+      if (canMove) {
+         this.moveLineHandlers = this.registerMoveLineHandlers();
+      }
+      void vscode.commands.executeCommand("setContext", "csvTableEditor.canMoveTableStructure", canMove);
+      if (!canMove) {
+         this.moveLineHandlers?.dispose();
+         this.moveLineHandlers = undefined;
+      }
+   }
+
+   private registerMoveLineHandlers(): vscode.Disposable {
+      const handlers: vscode.Disposable[] = [];
+      // 工作台会优先派发给最后注册的同名处理器，释放后恢复内置处理器。
+      for (const [command, direction] of nativeMoveLineCommands) {
+         try {
+            handlers.push(
+               vscode.commands.registerCommand(command, () => this.runTableAction({ kind: "moveTableStructure", direction })),
+            );
+         } catch (error) {
+            console.warn(`Could not handle ${command} in CSV Table Editor.`, error);
+         }
+      }
+      return vscode.Disposable.from(...handlers);
    }
 
    toggleTextWrapping(resource?: vscode.Uri): void {
@@ -26,7 +114,7 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
    }
 
    async selectDelimiter(): Promise<void> {
-      const session = [...this.sessions].find(({ panel }) => panel.active);
+      const session = this.activeSession();
       if (session) {
          await session.selectDelimiter();
       } else {
@@ -36,6 +124,8 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
 }
 
 class DocumentController {
+   keyboardMode: KeyboardMode = "inactive";
+   private hasSelectedCell = false;
    private readonly delimiterKey: string;
    private readonly columnWidthsKey: string;
    private readonly fallback: string;
@@ -55,6 +145,7 @@ class DocumentController {
       private readonly context: vscode.ExtensionContext,
       readonly document: vscode.TextDocument,
       readonly panel: vscode.WebviewPanel,
+      private readonly onKeyboardModeChange: () => void,
    ) {
       this.delimiterKey = `delimiter:${document.uri.toString()}`;
       this.columnWidthsKey = `columnWidths:${document.uri.toString()}`;
@@ -102,6 +193,14 @@ class DocumentController {
    toggleTextWrapping(): void {
       this.textWrapping = !this.textWrapping;
       this.post({ type: "textWrapping", enabled: this.textWrapping });
+   }
+
+   runTableAction(action: TableAction): void {
+      this.post({ type: "tableAction", action });
+   }
+
+   get canMoveTableStructure(): boolean {
+      return this.keyboardMode === "grid" && this.hasSelectedCell;
    }
 
    async selectDelimiter(): Promise<void> {
@@ -191,6 +290,9 @@ class DocumentController {
             this.updateSnapshot();
          }
          this.ready = true;
+         this.keyboardMode = "inactive";
+         this.hasSelectedCell = false;
+         this.onKeyboardModeChange();
          this.post({ type: "textWrapping", enabled: this.textWrapping });
          this.post({
             type: "snapshot",
@@ -200,6 +302,10 @@ class DocumentController {
          this.git.schedule();
       } else if (message.type === "delimiter") {
          await this.selectDelimiter();
+      } else if (message.type === "keyboardMode") {
+         this.keyboardMode = message.mode;
+         this.hasSelectedCell = message.hasSelectedCell;
+         this.onKeyboardModeChange();
       } else if (message.type === "columnResized") {
          await this.saveColumnWidth(message.column, message.width);
       } else {
@@ -209,7 +315,14 @@ class DocumentController {
          } else {
             this.editing = true;
             try {
-               await this.apply(message);
+               if (message.type === "edit") {
+                  await this.apply(message);
+               } else {
+                  this.checkDocumentVersion(message.revision, message.version);
+               }
+               if ((message.type === "save" || message.save) && !(await this.document.save()) && this.document.isDirty) {
+                  throw new Error("VS Code could not save this file.");
+               }
             } catch (failure) {
                error = failure instanceof Error ? failure.message : "The edit could not be applied.";
             } finally {
@@ -239,9 +352,10 @@ class DocumentController {
    }
 
    private async apply({ revision, version, operation }: Extract<WebviewMessage, { type: "edit" }>): Promise<void> {
+      this.checkDocumentVersion(revision, version);
       const parsed = this.parsed;
-      if (!parsed || revision !== this.snapshot.revision || version !== this.document.version) {
-         throw new Error("The document changed. Try the edit again on the current table.");
+      if (!parsed) {
+         throw new Error("The document could not be parsed.");
       }
       let editOperation: Exclude<Operation, { kind: "rename" }>;
       if (operation.kind === "rename") {
@@ -262,9 +376,7 @@ class DocumentController {
       } else {
          editOperation = operation;
       }
-      if (this.disposed || revision !== this.snapshot.revision || version !== this.document.version) {
-         throw new Error("The document changed. Try the edit again on the current table.");
-      }
+      this.checkDocumentVersion(revision, version);
       if (editOperation.kind === "cell") {
          editOperation = { ...editOperation, value: editOperation.value.replace(/\r\n|\r|\n/g, parsed.newline) };
       }
@@ -284,6 +396,12 @@ class DocumentController {
          throw new Error("VS Code rejected the edit. The table has been refreshed.");
       }
    }
+
+   private checkDocumentVersion(revision: number, version: number): void {
+      if (this.disposed || revision !== this.snapshot.revision || version !== this.document.version) {
+         throw new Error("The document changed. Try the edit again on the current table.");
+      }
+   }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -297,6 +415,11 @@ function isWebviewMessage(value: unknown): value is WebviewMessage {
    if (value.type === "ready" || value.type === "delimiter") {
       return true;
    }
+   if (value.type === "keyboardMode") {
+      return (
+         typeof value.hasSelectedCell === "boolean" && (value.mode === "inactive" || value.mode === "grid" || value.mode === "editing")
+      );
+   }
    if (value.type === "columnResized") {
       return (
          typeof value.column === "number" &&
@@ -308,10 +431,10 @@ function isWebviewMessage(value: unknown): value is WebviewMessage {
       );
    }
    return (
-      value.type === "edit" &&
       Number.isSafeInteger(value.revision) &&
       Number.isSafeInteger(value.version) &&
-      isOperation(value.operation)
+      (value.type === "save" ||
+         (value.type === "edit" && (value.save === undefined || typeof value.save === "boolean") && isOperation(value.operation)))
    );
 }
 
