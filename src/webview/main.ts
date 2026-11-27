@@ -519,10 +519,11 @@ function asText(value: string): HTMLElement {
 function updateKeyboardMode(force = false): void {
    const focused = document.activeElement;
    let mode: KeyboardMode = "inactive";
-   if (!composing && document.hasFocus() && focused && tableElement.contains(focused)) {
+   if (document.hasFocus() && focused && tableElement.contains(focused)) {
       if (focused === activeEditorInput()) {
-         mode = "editing";
+         mode = composing ? "composing" : "editing";
       } else if (
+         !composing &&
          !(focused instanceof HTMLInputElement) &&
          !(focused instanceof HTMLTextAreaElement) &&
          !(focused instanceof HTMLElement && focused.isContentEditable)

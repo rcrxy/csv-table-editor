@@ -1,7 +1,7 @@
 export type Direction = -1 | 1;
 
 export type TableDirection = "up" | "down" | "left" | "right";
-export type KeyboardMode = "inactive" | "grid" | "editing";
+export type KeyboardMode = "inactive" | "grid" | "editing" | "composing";
 export type StructureMenuCommand =
    | "insertRowAbove"
    | "insertRowBelow"

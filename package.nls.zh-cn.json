@@ -8,6 +8,8 @@
    "command.toggleTextWrapping": "切换单元格文本换行",
    "command.editCell": "编辑单元格",
    "command.moveCellSelection": "DelimGrid：移动单元格选区",
+   "command.moveRowUp": "DelimGrid：向上移动行",
+   "command.moveRowDown": "DelimGrid：向下移动行",
    "command.moveColumnLeft": "DelimGrid：向左移动列",
    "command.moveColumnRight": "DelimGrid：向右移动列",
    "command.submitCellEdit": "DelimGrid：提交单元格编辑并选中下一行",

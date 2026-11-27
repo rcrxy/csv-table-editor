@@ -16,22 +16,12 @@ import { configureWebview } from "./webview";
 
 export const viewType = "csv-table-editor.table";
 
-const nativeMoveLineCommands = [
-   ["editor.action.moveLinesUpAction", "up"],
-   ["editor.action.moveLinesDownAction", "down"],
-] as const;
-
 export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
    private readonly sessions = new Set<DocumentController>();
    private keyboardMode: KeyboardMode = "inactive";
    private canMoveTableStructure = false;
-   private moveLineHandlers: vscode.Disposable | undefined;
 
    constructor(private readonly context: vscode.ExtensionContext) {}
-
-   dispose(): void {
-      this.moveLineHandlers?.dispose();
-   }
 
    resolveCustomTextEditor(document: vscode.TextDocument, panel: vscode.WebviewPanel): void {
       const session = new DocumentController(this.context, document, panel, () => this.updateKeyboardContext());
@@ -151,33 +141,10 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
          void vscode.commands.executeCommand("setContext", "csvTableEditor.keyboardMode", mode);
       }
       const canMove = session?.canMoveTableStructure ?? false;
-      if (canMove === this.canMoveTableStructure) {
-         return;
+      if (canMove !== this.canMoveTableStructure) {
+         this.canMoveTableStructure = canMove;
+         void vscode.commands.executeCommand("setContext", "csvTableEditor.canMoveTableStructure", canMove);
       }
-      this.canMoveTableStructure = canMove;
-      if (canMove) {
-         this.moveLineHandlers = this.registerMoveLineHandlers();
-      }
-      void vscode.commands.executeCommand("setContext", "csvTableEditor.canMoveTableStructure", canMove);
-      if (!canMove) {
-         this.moveLineHandlers?.dispose();
-         this.moveLineHandlers = undefined;
-      }
-   }
-
-   private registerMoveLineHandlers(): vscode.Disposable {
-      const handlers: vscode.Disposable[] = [];
-      // 工作台会优先派发给最后注册的同名处理器，释放后恢复内置处理器。
-      for (const [command, direction] of nativeMoveLineCommands) {
-         try {
-            handlers.push(
-               vscode.commands.registerCommand(command, () => this.runTableAction({ kind: "moveTableStructure", direction })),
-            );
-         } catch (error) {
-            console.warn(`Could not handle ${command} in DelimGrid.`, error);
-         }
-      }
-      return vscode.Disposable.from(...handlers);
    }
 
    toggleTextWrapping(resource?: vscode.Uri): void {
@@ -626,7 +593,8 @@ function isWebviewMessage(value: unknown): value is WebviewMessage {
    }
    if (value.type === "keyboardMode") {
       return (
-         typeof value.hasSelectedCell === "boolean" && (value.mode === "inactive" || value.mode === "grid" || value.mode === "editing")
+         typeof value.hasSelectedCell === "boolean" &&
+         (value.mode === "inactive" || value.mode === "grid" || value.mode === "editing" || value.mode === "composing")
       );
    }
    if (value.type === "columnResized") {

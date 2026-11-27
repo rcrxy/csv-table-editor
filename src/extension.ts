@@ -16,7 +16,6 @@ const structureMenuCommands = [
 export function activate(context: vscode.ExtensionContext): void {
    const provider = new CsvTableEditorProvider(context);
    context.subscriptions.push(
-      provider,
       vscode.window.registerCustomEditorProvider(viewType, provider, {
          webviewOptions: { retainContextWhenHidden: true },
       }),
@@ -49,6 +48,12 @@ export function activate(context: vscode.ExtensionContext): void {
             provider.runTableAction({ kind: "moveCellSelection", direction });
          }
       }),
+      vscode.commands.registerCommand("delimgrid.moveRowUp", () =>
+         provider.runTableAction({ kind: "moveTableStructure", direction: "up" }),
+      ),
+      vscode.commands.registerCommand("delimgrid.moveRowDown", () =>
+         provider.runTableAction({ kind: "moveTableStructure", direction: "down" }),
+      ),
       vscode.commands.registerCommand("delimgrid.moveColumnLeft", () =>
          provider.runTableAction({ kind: "moveTableStructure", direction: "left" }),
       ),

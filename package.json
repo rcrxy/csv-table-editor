@@ -50,6 +50,14 @@
                 "title": "%command.moveCellSelection%"
             },
             {
+                "command": "delimgrid.moveRowUp",
+                "title": "%command.moveRowUp%"
+            },
+            {
+                "command": "delimgrid.moveRowDown",
+                "title": "%command.moveRowDown%"
+            },
+            {
                 "command": "delimgrid.moveColumnLeft",
                 "title": "%command.moveColumnLeft%"
             },
@@ -206,21 +214,26 @@
                 "command": "delimgrid.undoCellEdit",
                 "key": "ctrl+z",
                 "mac": "cmd+z",
-                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode =~ /^(editing|composing)$/"
             },
             {
                 "command": "delimgrid.redoCellEdit",
                 "key": "ctrl+y",
                 "mac": "cmd+shift+z",
-                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode =~ /^(editing|composing)$/"
             },
             {
-                "command": "editor.action.moveLinesUpAction",
+                "command": "delimgrid.redoCellEdit",
+                "key": "ctrl+shift+z",
+                "when": "!isMac && activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode =~ /^(editing|composing)$/"
+            },
+            {
+                "command": "delimgrid.moveRowUp",
                 "key": "alt+up",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.canMoveTableStructure"
             },
             {
-                "command": "editor.action.moveLinesDownAction",
+                "command": "delimgrid.moveRowDown",
                 "key": "alt+down",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.canMoveTableStructure"
             },
@@ -247,6 +260,8 @@
                 { "command": "delimgrid.toggleTextWrapping", "when": "false" },
                 { "command": "delimgrid.editCell", "when": "false" },
                 { "command": "delimgrid.moveCellSelection", "when": "false" },
+                { "command": "delimgrid.moveRowUp", "when": "false" },
+                { "command": "delimgrid.moveRowDown", "when": "false" },
                 { "command": "delimgrid.moveColumnLeft", "when": "false" },
                 { "command": "delimgrid.moveColumnRight", "when": "false" },
                 { "command": "delimgrid.submitCellEdit", "when": "false" },

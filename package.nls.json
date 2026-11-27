@@ -8,6 +8,8 @@
    "command.toggleTextWrapping": "Toggle Cell Text Wrapping",
    "command.editCell": "Edit Cell",
    "command.moveCellSelection": "DelimGrid: Move Cell Selection",
+   "command.moveRowUp": "DelimGrid: Move Row Up",
+   "command.moveRowDown": "DelimGrid: Move Row Down",
    "command.moveColumnLeft": "DelimGrid: Move Column Left",
    "command.moveColumnRight": "DelimGrid: Move Column Right",
    "command.submitCellEdit": "DelimGrid: Submit Cell Edit and Select Next Row",
