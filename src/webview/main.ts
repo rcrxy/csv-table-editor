@@ -869,13 +869,73 @@ function selectAndRevealCell(row: number, column: number): void {
    const target = destination?.getRow();
    if (destination && target && (target.isFrozen() || target.getPosition() !== false)) {
       selectCell(row, column);
-      if (!target.isFrozen()) {
-         void table.scrollToRow(target, "nearest", false).catch(() => {});
+      const selection = selectedCell;
+      requestAnimationFrame(() => {
+         // 连续按键时，只滚动到当前选中的单元格。
+         if (selection && selectedCell === selection) {
+            void revealSelectedCell(selection);
+         }
+      });
+   }
+}
+
+async function revealSelectedCell(selection: { row: number; column: number }): Promise<void> {
+   let cell = cellAt(selection.row, selection.column);
+   const viewport = tableElement.querySelector<HTMLElement>(".tabulator-tableholder");
+   if (!cell || !viewport?.clientHeight || !viewport.clientWidth) {
+      return;
+   }
+   const initialRow = cell.getRow();
+   if (!initialRow.isFrozen() && !viewport.contains(cell.getElement())) {
+      // 虚拟列表中尚未挂载的行，先交给 Tabulator 定位并渲染。
+      try {
+         await table.scrollToRow(initialRow, "nearest", true);
+      } catch {
+         return;
       }
-      if (column >= frozenColumnCount) {
-         void table.scrollToColumn(destination.getField(), "middle", false).catch(() => {});
+      // 初次渲染会重建单元格节点。
+      cell = cellAt(selection.row, selection.column);
+   }
+   if (selectedCell !== selection || !cell || !tableElement.contains(cell.getElement())) {
+      return;
+   }
+
+   const row = cell.getRow();
+   const bounds = cell.getElement().getBoundingClientRect();
+   const area = viewport.getBoundingClientRect();
+   if (!row.isFrozen()) {
+      const top = area.top + viewport.clientTop;
+      const delta = scrollDelta(bounds.top, bounds.bottom, top, top + viewport.clientHeight);
+      if (delta) {
+         viewport.scrollTop += delta;
       }
    }
+   if (selection.column >= frozenColumnCount) {
+      const left = area.left + viewport.clientLeft;
+      const right = left + viewport.clientWidth;
+      const frozenField = frozenColumnCount ? `c${frozenColumnCount - 1}` : "_line";
+      const frozenEdge = row.getCell(frozenField);
+      const visibleLeft = frozenEdge ? Math.max(left, frozenEdge.getElement().getBoundingClientRect().right) : left;
+      const delta = scrollDelta(bounds.left, bounds.right, visibleLeft, right);
+      if (delta) {
+         viewport.scrollLeft += delta;
+      }
+   }
+}
+
+function scrollDelta(start: number, end: number, visibleStart: number, visibleEnd: number): number {
+   if (visibleStart >= visibleEnd) {
+      return 0;
+   }
+   const startOffset = start - visibleStart;
+   const endOffset = end - visibleEnd;
+   if (startOffset < 0 && endOffset < 0) {
+      return Math.max(startOffset, endOffset);
+   }
+   if (startOffset > 0 && endOffset > 0) {
+      return Math.min(startOffset, endOffset);
+   }
+   return 0;
 }
 
 function hasHeaderFilters(): boolean {
