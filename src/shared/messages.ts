@@ -3,6 +3,7 @@ export type Direction = -1 | 1;
 export type TableDirection = "up" | "down" | "left" | "right";
 export type KeyboardMode = "inactive" | "grid" | "editing";
 export type StructureMenuCommand =
+   | "renameColumn"
    | "insertRowAbove"
    | "insertRowBelow"
    | "insertColumnLeft"
@@ -20,6 +21,7 @@ export type TableAction =
    | { kind: "clearCell"; target?: CellTarget }
    | { kind: "prepareCacheReload" }
    | { kind: "insertCellLineBreak" }
+   | { kind: "cancelCellEdit" }
    | {
         kind: "editStructureFromMenu";
         command: StructureMenuCommand;
@@ -29,7 +31,7 @@ export type TableAction =
 
 export type Operation =
    | { kind: "cell"; row: number; column: number; value: string }
-   | { kind: "rename"; column: number }
+   | { kind: "pasteColumn"; row: number; column: number; values: string[] }
    | { kind: "addRow"; before?: number }
    | { kind: "deleteRow"; row: number }
    | { kind: "moveRow"; row: number; direction: Direction }

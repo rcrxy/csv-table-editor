@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import { delimiters, delimiterError, detectDelimiter, parseDocument, type ParsedDocument } from "../core/CsvParser";
-import { documentEdits } from "../core/DocumentEdits";
+import { documentEdits, encodeField } from "../core/DocumentEdits";
 import { GitGutter } from "../git/GitGutter";
 import type {
    HostMessage,
@@ -87,6 +87,7 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
          return;
       }
       if (
+         (command === "renameColumn" && (context.webviewSection !== "header" || context.canRenameTableColumn !== true)) ||
          (command === "deleteRow" && context.canDeleteTableRow !== true) ||
          (command === "deleteColumn" && context.canDeleteTableColumn !== true) ||
          (command === "freezeCell" && context.canFreezePanes !== true) ||
@@ -103,6 +104,23 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
       ) {
          session.runTableAction({ kind: "editStructureFromMenu", command, target: { field, rowId, revision, version } });
       }
+   }
+
+   async copyTableRange(context: unknown): Promise<void> {
+      const session = this.activeSession();
+      if (
+         !session ||
+         !isRecord(context) ||
+         context.webview !== viewType ||
+         context.tableResource !== session.document.uri.toString() ||
+         context.canCopyTableRange !== true ||
+         typeof context.field !== "string" ||
+         typeof context.revision !== "number" ||
+         typeof context.version !== "number"
+      ) {
+         return;
+      }
+      await session.copyTableRange(context.field, context.rowId, context.revision, context.version);
    }
 
    private activeSession(): DocumentController | undefined {
@@ -245,6 +263,51 @@ class DocumentController {
 
    get canMoveTableStructure(): boolean {
       return this.keyboardMode === "grid" && this.hasSelectedCell;
+   }
+
+   async copyTableRange(field: string, rowId: unknown, revision: number, version: number): Promise<void> {
+      const { parsed, snapshot } = this;
+      if (!parsed || this.disposed || revision !== snapshot.revision || version !== this.document.version) {
+         return;
+      }
+      let text: string;
+      if (field === "_line") {
+         if (
+            !snapshot.showRowNumbers ||
+            typeof rowId !== "number" ||
+            !Number.isSafeInteger(rowId) ||
+            rowId < (snapshot.tableHeader ? 1 : 0)
+         ) {
+            return;
+         }
+         const row = parsed.rows[rowId];
+         if (!row) {
+            return;
+         }
+         text = Array.from({ length: parsed.columnCount }, (_, column) => encodeField(row.values[column] ?? "", "\t")).join(
+            "\t",
+         );
+      } else {
+         if (rowId !== undefined || !/^c\d+$/.test(field)) {
+            return;
+         }
+         const column = Number(field.slice(1));
+         if (column >= parsed.columnCount) {
+            return;
+         }
+         // 直接使用源文件的记录，保留第一条记录中最新的表头文本。
+         const values = parsed.rows.map((row) => row.values[column] ?? "");
+         text = values.join("\n");
+         if (values.length > 1 && values.at(-1) === "") {
+            // 额外保留结束符，使最后一个空单元格仍占一行。
+            text += "\n";
+         }
+      }
+      try {
+         await vscode.env.clipboard.writeText(text);
+      } catch {
+         void vscode.window.showErrorMessage("Could not copy the selected row or column.");
+      }
    }
 
    private async clearAndReload(): Promise<void> {
@@ -493,29 +556,10 @@ class DocumentController {
       if (!parsed) {
          throw new Error("The document could not be parsed.");
       }
-      let editOperation: Exclude<Operation, { kind: "rename" }>;
-      if (operation.kind === "rename") {
-         if (!this.snapshot.header) {
-            throw new Error("Enable the first record as a header to rename a column.");
-         }
-         if (operation.column < 0 || operation.column >= parsed.columnCount) {
-            throw new Error("Select a column first.");
-         }
-         const name = await vscode.window.showInputBox({
-            title: "Rename column",
-            value: parsed.rows[0].values[operation.column] ?? "",
-         });
-         if (name === undefined) {
-            return;
-         }
-         editOperation = { kind: "cell", row: 0, column: operation.column, value: name };
-      } else {
-         editOperation = operation;
-      }
-      this.checkDocumentVersion(revision, version);
-      if (editOperation.kind === "cell") {
-         editOperation = { ...editOperation, value: editOperation.value.replace(/\r\n|\r|\n/g, parsed.newline) };
-      }
+      const editOperation =
+         operation.kind === "cell"
+            ? { ...operation, value: operation.value.replace(/\r\n|\r|\n/g, parsed.newline) }
+            : operation;
       const replacements = documentEdits(parsed, editOperation, this.snapshot.tableHeader);
       if (!replacements.length) {
          return;
@@ -584,7 +628,14 @@ function isOperation(value: unknown): value is Operation {
    switch (value.kind) {
       case "cell":
          return hasRow && hasColumn && typeof value.value === "string";
-      case "rename":
+      case "pasteColumn":
+         return (
+            hasRow &&
+            hasColumn &&
+            Array.isArray(value.values) &&
+            value.values.length > 1 &&
+            value.values.every((line: unknown) => typeof line === "string")
+         );
       case "deleteColumn":
          return hasColumn;
       case "deleteRow":

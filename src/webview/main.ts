@@ -37,6 +37,9 @@ let frozenColumnCount = 0;
 let renderedColumns = "";
 let textWrapping = false;
 let editingCell: CellComponent | undefined;
+let editingHeader:
+   | { row: number; column: number; input: HTMLTextAreaElement; label: HTMLElement; value: string }
+   | undefined;
 let editorBlurring = false;
 let keyboardMode: KeyboardMode = "inactive";
 let hasSelectedCell = false;
@@ -108,10 +111,21 @@ table.on("cellClick", (event, cell) => {
    }
 });
 table.on("headerClick", (event, column) => {
-   if (!(event.target instanceof HTMLInputElement)) {
+   if (!(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) {
+      const index = columnIndex(column.getField());
       clearCellSelection();
-      selectColumn(columnIndex(column.getField()));
+      if (snapshot?.header && index !== undefined) {
+         selectRow(undefined);
+      }
+      selectColumn(index);
       tableElement.focus({ preventScroll: true });
+   }
+});
+table.on("headerDblClick", (event, column) => {
+   const target = event.target;
+   const index = columnIndex(column.getField());
+   if (index !== undefined && target instanceof Element && target.closest(".tabulator-col-title")) {
+      startHeaderEdit(index);
    }
 });
 table.on("columnResized", (column) => {
@@ -152,7 +166,7 @@ table.on("cellEditCancelled", (cell) => {
    }
    // Tabulator 会移除输入框。等浏览器处理完焦点切换，再决定是否接回焦点。
    queueMicrotask(() => {
-      if (editingCell) {
+      if (editingCell || editingHeader) {
          return;
       }
       if (restoreFocus && document.hasFocus() && document.activeElement === document.body) {
@@ -203,12 +217,65 @@ tableElement.addEventListener("compositionend", () => {
    updateKeyboardMode();
 });
 
+// 快捷键和右键菜单沿用 VS Code 的原生剪贴板命令。
+window.addEventListener("copy", (event) => {
+   const clipboard = event.clipboardData;
+   const cell = selectedCellForClipboard(event);
+   if (clipboard && cell) {
+      clipboard.setData("text/plain", String(cell.getValue() ?? ""));
+      event.preventDefault();
+   }
+});
+
+window.addEventListener("paste", (event) => {
+   const clipboard = event.clipboardData;
+   if (!clipboard?.types.includes("text/plain")) {
+      return;
+   }
+   const cell = selectedCellForClipboard(event);
+   const column = cell && columnIndex(cell.getField());
+   if (!cell || column === undefined) {
+      return;
+   }
+   event.preventDefault();
+   const lines = clipboard.getData("text/plain").replace(/(?:\r\n|\r|\n)$/, "").split(/\r\n|\r|\n/);
+   const row = Number(cell.getRow().getIndex());
+   if (lines.length > 1) {
+      send({ kind: "pasteColumn", row, column, values: lines });
+      return;
+   }
+   const [value] = lines;
+   if (value !== String(cell.getValue() ?? "")) {
+      send({ kind: "cell", row, column, value });
+   }
+});
+
+function selectedCellForClipboard(event: ClipboardEvent): CellComponent | undefined {
+   const target = event.target;
+   if (
+      !event.isTrusted ||
+      event.defaultPrevented ||
+      editingCell ||
+      editingHeader ||
+      !selectedCell ||
+      snapshot?.error ||
+      pending !== undefined ||
+      queuedSnapshots ||
+      (target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea")))
+   ) {
+      return;
+   }
+   updateKeyboardMode();
+   if (keyboardMode === "grid") {
+      return cellAt(selectedCell.row, selectedCell.column);
+   }
+}
+
 // Enter 和 Ctrl+Enter 由 VS Code 命令处理，挡住浏览器可能先插入的换行。
 // Tabulator 的 Shift+Enter 直接更新编辑文本，仍可插入换行。
 tableElement.addEventListener("beforeinput", (event) => {
    if (
-      editingCell &&
-      event.target instanceof HTMLTextAreaElement &&
+      event.target === activeEditorInput() &&
       !composing &&
       !event.isComposing &&
       (event.inputType === "insertLineBreak" || event.inputType === "insertParagraph")
@@ -217,23 +284,26 @@ tableElement.addEventListener("beforeinput", (event) => {
    }
 });
 
-// Tabulator 会在键盘输入后调整高度。input 也覆盖粘贴、剪切和输入法更新。
+// input 同时覆盖键盘输入、粘贴、剪切和输入法更新。
 tableElement.addEventListener("input", ({ target }) => {
-   const cell = editingCell;
-   if (!cell || !(target instanceof HTMLTextAreaElement) || !cell.getElement().contains(target)) {
-      return;
+   const input = activeEditorInput();
+   if (input && target === input) {
+      resizeEditor(input, editingCell);
    }
-   resizeCellEditor(target, cell);
 });
 
-function resizeCellEditor(input: HTMLTextAreaElement, cell: CellComponent): void {
+function activeEditorInput(): HTMLTextAreaElement | undefined {
+   return editingHeader?.input ?? editingCell?.getElement().querySelector("textarea") ?? undefined;
+}
+
+function resizeEditor(input: HTMLTextAreaElement, cell?: CellComponent): void {
    const previousHeight = input.style.height;
    input.style.height = "auto";
    input.style.height = `${input.scrollHeight}px`;
    if (input.style.height !== previousHeight) {
-      const row = cell.getRow();
-      row.normalizeHeight();
-      if (row.isFrozen()) {
+      const row = cell?.getRow();
+      row?.normalizeHeight();
+      if (!row || row.isFrozen()) {
          table.redraw();
       }
    }
@@ -246,7 +316,7 @@ type MenuTarget =
 
 // 菜单定位使用源记录 ID。无表头时，删除列的入口取当前视图的第一行。
 function menuStructureOperation(
-   command: Exclude<StructureMenuCommand, "freezeCell" | "unfreezeCell">,
+   command: Exclude<StructureMenuCommand, "freezeCell" | "unfreezeCell" | "renameColumn">,
    field: string | undefined,
    rowId: number | undefined,
 ): Operation | undefined {
@@ -306,13 +376,17 @@ function freezePaneTarget(field: string | undefined, rowId: number | undefined):
 function setMenuTarget(element: HTMLElement, target: MenuTarget): void {
    const field = target.field;
    const rowId = "rowId" in target ? target.rowId : undefined;
+   const canCopyTableRange = !!snapshot && !snapshot.error && (target.webviewSection === "header" || field === "_line");
    element.dataset.vscodeContext = JSON.stringify({
       ...target,
       revision: snapshot?.revision,
       version: snapshot?.version,
       tableResource: snapshot?.resource,
+      canCopyTableRange,
+      preventDefaultContextMenuItems: canCopyTableRange,
       canFreezePanes: target.webviewSection === "cell" && !!freezePaneTarget(field, rowId),
       hasFrozenPanes: frozenRowCount > 0 || frozenColumnCount > 0,
+      canRenameTableColumn: target.webviewSection === "header" && !!snapshot?.header && !snapshot.error,
       canDeleteTableRow: !!menuStructureOperation("deleteRow", field, rowId),
       canDeleteTableColumn: !!menuStructureOperation("deleteColumn", field, rowId),
    });
@@ -349,6 +423,7 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
    if (data.type === "snapshot") {
       queuedSnapshots++;
       editingCell?.cancelEdit();
+      closeHeaderEditor(editingHeader?.input === document.activeElement);
       refreshControls();
    }
    updates = updates.then(async () => {
@@ -405,7 +480,6 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
 // deleteRow.onclick = () => selectedRow !== undefined && send({ kind: "deleteRow", row: selectedRow });
 // addColumn.onclick = () => send({ kind: "addColumn" });
 // deleteColumn.onclick = () => selectedColumn !== undefined && send({ kind: "deleteColumn", column: selectedColumn });
-// rename.onclick = () => selectedColumn !== undefined && send({ kind: "rename", column: selectedColumn });
 // reset.onclick = () => {
 //    table.clearFilter(true);
 //    refreshControls();
@@ -430,7 +504,7 @@ function updateKeyboardMode(force = false): void {
    const focused = document.activeElement;
    let mode: KeyboardMode = "inactive";
    if (!composing && document.hasFocus() && focused && tableElement.contains(focused)) {
-      if (focused instanceof HTMLTextAreaElement && editingCell?.getElement().contains(focused)) {
+      if (focused === activeEditorInput()) {
          mode = "editing";
       } else if (
          !(focused instanceof HTMLInputElement) &&
@@ -465,7 +539,12 @@ function runTableAction(action: TableAction): void {
    if (action.kind === "editStructureFromMenu") {
       const { field, rowId, revision, version } = action.target;
       if (snapshot?.revision === revision && snapshot.version === version) {
-         if (action.command === "freezeCell") {
+         if (action.command === "renameColumn") {
+            const column = field === undefined ? undefined : columnIndex(field);
+            if (column !== undefined && rowId === undefined) {
+               startHeaderEdit(column);
+            }
+         } else if (action.command === "freezeCell") {
             const target = freezePaneTarget(field, rowId);
             if (target) {
                setFrozenPanes(target.rows, target.columns);
@@ -484,17 +563,26 @@ function runTableAction(action: TableAction): void {
       }
       return;
    }
+   if (action.kind === "cancelCellEdit") {
+      if (keyboardMode === "editing") {
+         if (editingHeader) {
+            closeHeaderEditor(true);
+         } else {
+            editingCell?.cancelEdit();
+         }
+      }
+      return;
+   }
    if (action.kind === "insertCellLineBreak") {
-      const cell = editingCell;
-      const input = cell?.getElement().querySelector("textarea");
-      if (keyboardMode === "editing" && cell && input) {
+      const input = activeEditorInput();
+      if (keyboardMode === "editing" && input) {
          input.setRangeText("\n", input.selectionStart, input.selectionEnd, "end");
-         resizeCellEditor(input, cell);
+         resizeEditor(input, editingCell);
       }
       return;
    }
    if (action.kind === "editCell" || action.kind === "clearCell") {
-      if (editingCell) {
+      if (editingCell || editingHeader) {
          return;
       }
       let cell: CellComponent | undefined;
@@ -507,6 +595,10 @@ function runTableAction(action: TableAction): void {
          if (selectedCell) {
             cell = cellAt(selectedCell.row, selectedCell.column);
          } else if (action.kind === "editCell") {
+            if (snapshot?.header && selectedRow === undefined && selectedColumn !== undefined) {
+               startHeaderEdit(selectedColumn);
+               return;
+            }
             cell = selectedOrFirstCell();
          }
       }
@@ -534,7 +626,76 @@ function runTableAction(action: TableAction): void {
    }
 }
 
+function startHeaderEdit(column: number): void {
+   if (!snapshot?.header || snapshot.error || pending !== undefined || queuedSnapshots || editingCell || editingHeader) {
+      return;
+   }
+   const header = snapshot.header;
+   const component = table.getColumn(`c${column}`);
+   const label = component ? component.getElement().querySelector<HTMLElement>(".column-header-label") : null;
+   if (!label?.isConnected) {
+      return;
+   }
+   selectRow(undefined);
+   selectColumn(column);
+   const input = document.createElement("textarea");
+   input.className = "column-header-editor";
+   input.rows = 1;
+   input.wrap = "soft";
+   input.setAttribute("aria-label", label.textContent ?? "");
+   input.dataset.vscodeContext = JSON.stringify({
+      webviewSection: "headerEditor",
+      canCopyTableRange: false,
+      canDeleteTableColumn: false,
+      preventDefaultContextMenuItems: false,
+   });
+   const value = (header.values[column] ?? "").replace(/\r\n?/g, "\n");
+   input.value = value;
+   editingHeader = { row: header.id, column, input, label, value };
+   input.addEventListener("blur", () => {
+      if (editingHeader?.input === input) {
+         submitHeaderEdit(false);
+      }
+   });
+   label.replaceWith(input);
+   input.focus({ preventScroll: true });
+   resizeEditor(input);
+}
+
+function closeHeaderEditor(restoreFocus = false): void {
+   if (!editingHeader) {
+      return;
+   }
+   const { input, label } = editingHeader;
+   editingHeader = undefined;
+   composing = false;
+   input.replaceWith(label);
+   table.redraw();
+   if (restoreFocus) {
+      tableElement.focus({ preventScroll: true });
+   }
+   updateTextWrapping();
+   refreshControls();
+}
+
+function submitHeaderEdit(save: boolean, moveToNextRow = false, restoreFocus = false): void {
+   if (!editingHeader) {
+      return;
+   }
+   const { row, column, input, value: original } = editingHeader;
+   const value = input.value;
+   const nextRow = moveToNextRow ? table.getRows("active")[0] : undefined;
+   closeHeaderEditor(restoreFocus);
+   if (send(value === original ? undefined : { kind: "cell", row, column, value }, save)) {
+      selectionAfterEdit = nextRow ? { row: Number(nextRow.getIndex()), column } : undefined;
+   }
+}
+
 function submitCellEdit(save: boolean, moveToNextRow = false): void {
+   if (editingHeader) {
+      submitHeaderEdit(save, moveToNextRow, true);
+      return;
+   }
    const cell = editingCell;
    const input = cell?.getElement().querySelector("textarea");
    const column = cell && columnIndex(cell.getField());
@@ -559,7 +720,7 @@ function submitCellEdit(save: boolean, moveToNextRow = false): void {
 }
 
 function updateTextWrapping(): void {
-   if (editingCell || tableElement.classList.contains("wrap-cell-text") === textWrapping) {
+   if (editingCell || editingHeader || tableElement.classList.contains("wrap-cell-text") === textWrapping) {
       return;
    }
    tableElement.classList.toggle("wrap-cell-text", textWrapping);
@@ -737,7 +898,15 @@ function moveSelection(vertical: boolean, direction: Direction): void {
 
 // 数据修改携带当前快照和文档版本，由扩展宿主应用到 TextDocument。
 function send(operation: Operation | undefined, save = false): boolean {
-   if (!snapshot || snapshot.error || pending !== undefined || queuedSnapshots || editingCell || (!operation && !save)) {
+   if (
+      !snapshot ||
+      snapshot.error ||
+      pending !== undefined ||
+      queuedSnapshots ||
+      editingCell ||
+      editingHeader ||
+      (!operation && !save)
+   ) {
       return false;
    }
    const { revision, version } = snapshot;
@@ -749,7 +918,7 @@ function send(operation: Operation | undefined, save = false): boolean {
 }
 
 function setFrozenPanes(rows: number, columns: number): void {
-   if (!snapshot || snapshot.error || pending !== undefined || queuedSnapshots || editingCell) {
+   if (!snapshot || snapshot.error || pending !== undefined || queuedSnapshots || editingCell || editingHeader) {
       return;
    }
    const rowsChanged = rows !== frozenRowCount;
@@ -801,7 +970,12 @@ function applyColumns(next: Snapshot): void {
       const width = widths.get(field) ?? Math.min(80, next.cellMaxWidth);
       return {
          title: `Column ${index + 1}`,
-         titleFormatter: () => asText(name || `Column ${index + 1}`),
+         headerHozAlign: "center",
+         titleFormatter: () => {
+            const label = asText(name || `Column ${index + 1}`);
+            label.className = "column-header-label";
+            return label;
+         },
          field,
          frozen: index < frozenColumnCount,
          width,
@@ -825,7 +999,7 @@ function applyColumns(next: Snapshot): void {
             verticalNavigation: "editor",
             elementAttributes: { rows: "1", wrap: "soft" },
          }),
-         editable: () => !!snapshot && !snapshot.error && pending === undefined && !queuedSnapshots,
+         editable: () => !!snapshot && !snapshot.error && pending === undefined && !queuedSnapshots && !editingHeader,
       };
    });
    // 可选的序列号列显示源文件行号和 Git 标记。数据列的字段名与它的显示状态无关。
@@ -914,14 +1088,13 @@ async function render(next: Snapshot): Promise<void> {
 // 集中更新状态栏，也保留了原工具栏的启用条件供改版时参考。
 function refreshControls(): void {
    updateKeyboardMode();
-   const busy = pending !== undefined || queuedSnapshots > 0 || editingCell !== undefined;
+   const busy = pending !== undefined || queuedSnapshots > 0 || editingCell !== undefined || editingHeader !== undefined;
    const editable = !!snapshot && !snapshot.error && !busy;
    // delimiterButton.disabled = !snapshot || busy;
    // addRow.disabled = !editable;
    // deleteRow.disabled = !editable || selectedRow === undefined;
    // addColumn.disabled = !editable;
    // deleteColumn.disabled = !editable || selectedColumn === undefined || (snapshot?.columnCount ?? 0) < 2;
-   // rename.disabled = !editable || selectedColumn === undefined;
    // reset.disabled = !snapshot || busy || !hasHeaderFilters();
    if (!snapshot) {
       return;

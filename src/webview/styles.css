@@ -113,6 +113,28 @@ button:focus-visible,
    text-overflow: ellipsis;
 }
 
+.tabulator .tabulator-header .tabulator-col.data-cell .tabulator-col-title {
+   font-size: calc(1em + 1px);
+   font-weight: 700;
+}
+
+.tabulator .tabulator-header .tabulator-col .column-header-editor {
+   display: block;
+   box-sizing: border-box;
+   width: 100%;
+   padding: 0;
+   border: 0;
+   outline: none;
+   resize: none;
+   overflow: hidden;
+   background: var(--vscode-input-background);
+   color: var(--vscode-input-foreground);
+   font: inherit;
+   text-align: inherit;
+   white-space: pre-wrap;
+   overflow-wrap: anywhere;
+}
+
 /* 选中列保留背景和顶部描边。 */
 .tabulator .tabulator-header .tabulator-col.selected-column {
    background: var(--vscode-list-hoverBackground);

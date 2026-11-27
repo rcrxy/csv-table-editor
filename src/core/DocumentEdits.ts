@@ -14,14 +14,60 @@ export function encodeField(value: string, delimiter: string, quoted = false): s
    return value;
 }
 
+function cellEdits(document: ParsedDocument, index: number, column: number, value: string): TextReplacement[] {
+   const { rows, delimiter } = document;
+   const row = rows[index];
+   const field = row.fields[column];
+   if (field && row.values[column] === value) {
+      return [];
+   }
+   if (!field) {
+      const padding = delimiter.repeat(column - row.fields.length + 1);
+      return [{ start: row.end, end: row.end, text: padding + encodeField(value, delimiter) }];
+   }
+   // 保留文件末尾的空记录，并防止相邻的 CR 和 LF 合并成一个换行。
+   const needsEmptyField = !row.eol || (row.eol === "\n" && rows[index - 1]?.eol === "\r");
+   const quoted = field.quoteEnd !== undefined || (row.fields.length === 1 && value === "" && needsEmptyField);
+   return [{ start: field.start, end: field.quoteEnd ?? field.end, text: encodeField(value, delimiter, quoted) }];
+}
+
 export function documentEdits(
    document: ParsedDocument,
-   operation: Exclude<Operation, { kind: "rename" }>,
+   operation: Operation,
    tableHeader: boolean,
 ): TextReplacement[] {
    const { rows, delimiter, newline, text, columnCount, bomLength } = document;
    const firstDataRow = tableHeader ? 1 : 0;
    const last = rows.at(-1);
+   if (operation.kind === "pasteColumn") {
+      const { row, column, values } = operation;
+      if (!last || !Number.isInteger(row) || row < firstDataRow || row >= rows.length) {
+         throw new Error("Select a data record first.");
+      }
+      if (!Number.isInteger(column) || column < 0 || column >= columnCount) {
+         throw new Error("The selected column no longer exists.");
+      }
+      const existingCount = Math.min(values.length, rows.length - row);
+      const edits = values.slice(0, existingCount).flatMap((value, index) => cellEdits(document, row + index, column, value));
+      const overflow = values.slice(existingCount);
+      if (overflow.length) {
+         const before = delimiter.repeat(column);
+         const after = delimiter.repeat(columnCount - column - 1);
+         const eol = last.eol || newline;
+         const records = overflow.map(
+            (value) => before + encodeField(value, delimiter, columnCount === 1 && value === "") + after,
+         );
+         const insertion = last.eol ? records.join(eol) + eol : eol + records.join(eol);
+         // 文件最后一个字段也被修改时，将追加内容合并到同一个文本替换。
+         const finalEdit = edits.at(-1);
+         if (finalEdit?.end === text.length) {
+            finalEdit.text += insertion;
+         } else {
+            edits.push({ start: text.length, end: text.length, text: insertion });
+         }
+      }
+      return edits;
+   }
    if (operation.kind === "addRow") {
       const index = operation.before ?? rows.length;
       if (!Number.isInteger(index) || index < Math.min(firstDataRow, rows.length) || index > rows.length) {
@@ -85,17 +131,7 @@ export function documentEdits(
       if (!Number.isInteger(column) || column < 0 || column >= columnCount) {
          throw new Error("The selected column no longer exists.");
       }
-      const field = row.fields[column];
-      if (field && row.values[column] === value) {
-         return [];
-      }
-      if (!field) {
-         const padding = delimiter.repeat(column - row.fields.length + 1);
-         return [{ start: row.end, end: row.end, text: padding + encodeField(value, delimiter) }];
-      }
-      const emptyRecordAtEof = row.fields.length === 1 && !row.eol && value === "";
-      const quoted = field.quoteEnd !== undefined || emptyRecordAtEof;
-      return [{ start: field.start, end: field.quoteEnd ?? field.end, text: encodeField(value, delimiter, quoted) }];
+      return cellEdits(document, index, column, value);
    }
 
    const addingColumn = operation.kind === "addColumn";
