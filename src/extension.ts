@@ -59,6 +59,12 @@ export function activate(context: vscode.ExtensionContext): void {
          provider.runTableAction({ kind: "submitCellEdit", save: save === true }),
       ),
       vscode.commands.registerCommand("delimgrid.cancelCellEdit", () => provider.runTableAction({ kind: "cancelCellEdit" })),
+      vscode.commands.registerCommand("delimgrid.undoCellEdit", () =>
+         provider.runTableAction({ kind: "editCellHistory", command: "undo" }),
+      ),
+      vscode.commands.registerCommand("delimgrid.redoCellEdit", () =>
+         provider.runTableAction({ kind: "editCellHistory", command: "redo" }),
+      ),
       vscode.commands.registerCommand("delimgrid.insertCellLineBreak", () =>
          provider.runTableAction({ kind: "insertCellLineBreak" }),
       ),

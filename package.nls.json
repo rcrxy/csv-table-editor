@@ -12,6 +12,8 @@
    "command.moveColumnRight": "DelimGrid: Move Column Right",
    "command.submitCellEdit": "DelimGrid: Submit Cell Edit and Select Next Row",
    "command.cancelCellEdit": "DelimGrid: Cancel Cell Edit",
+   "command.undoCellEdit": "DelimGrid: Undo Cell Edit",
+   "command.redoCellEdit": "DelimGrid: Redo Cell Edit",
    "command.insertCellLineBreak": "DelimGrid: Insert Line Break in Cell",
    "command.clearCell": "Clear Cell",
    "command.copyTableRange": "Copy",

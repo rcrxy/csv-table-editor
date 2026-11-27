@@ -66,6 +66,14 @@
                 "title": "%command.cancelCellEdit%"
             },
             {
+                "command": "delimgrid.undoCellEdit",
+                "title": "%command.undoCellEdit%"
+            },
+            {
+                "command": "delimgrid.redoCellEdit",
+                "title": "%command.redoCellEdit%"
+            },
+            {
                 "command": "delimgrid.insertCellLineBreak",
                 "title": "%command.insertCellLineBreak%"
             },
@@ -179,6 +187,11 @@
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
             },
             {
+                "command": "delimgrid.insertCellLineBreak",
+                "key": "shift+enter",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
+            },
+            {
                 "command": "delimgrid.submitCellEdit",
                 "key": "ctrl+enter",
                 "args": true,
@@ -187,6 +200,18 @@
             {
                 "command": "delimgrid.cancelCellEdit",
                 "key": "escape",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
+            },
+            {
+                "command": "delimgrid.undoCellEdit",
+                "key": "ctrl+z",
+                "mac": "cmd+z",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
+            },
+            {
+                "command": "delimgrid.redoCellEdit",
+                "key": "ctrl+y",
+                "mac": "cmd+shift+z",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"
             },
             {
@@ -226,6 +251,8 @@
                 { "command": "delimgrid.moveColumnRight", "when": "false" },
                 { "command": "delimgrid.submitCellEdit", "when": "false" },
                 { "command": "delimgrid.cancelCellEdit", "when": "false" },
+                { "command": "delimgrid.undoCellEdit", "when": "false" },
+                { "command": "delimgrid.redoCellEdit", "when": "false" },
                 { "command": "delimgrid.insertCellLineBreak", "when": "false" },
                 { "command": "delimgrid.clearCell", "when": "false" },
                 { "command": "delimgrid.copyTableRange", "when": "false" },

@@ -12,6 +12,8 @@
    "command.moveColumnRight": "DelimGrid：向右移动列",
    "command.submitCellEdit": "DelimGrid：提交单元格编辑并选中下一行",
    "command.cancelCellEdit": "DelimGrid：取消单元格编辑",
+   "command.undoCellEdit": "DelimGrid：撤销输入框编辑",
+   "command.redoCellEdit": "DelimGrid：重做输入框编辑",
    "command.insertCellLineBreak": "DelimGrid：在单元格内插入换行",
    "command.clearCell": "清空单元格",
    "command.copyTableRange": "复制",

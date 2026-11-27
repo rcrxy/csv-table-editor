@@ -20,6 +20,7 @@ export type TableAction =
    | { kind: "clearCell"; target?: CellTarget }
    | { kind: "prepareCacheReload" }
    | { kind: "insertCellLineBreak" }
+   | { kind: "editCellHistory"; command: "undo" | "redo" }
    | { kind: "cancelCellEdit" }
    | { kind: "pasteTableColumn"; column: number; revision: number; version: number; text: string }
    | {

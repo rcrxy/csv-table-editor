@@ -289,7 +289,6 @@ function canUseGridClipboard(event: ClipboardEvent): boolean {
 }
 
 // Enter 和 Ctrl+Enter 由 VS Code 命令处理，挡住浏览器可能先插入的换行。
-// Tabulator 的 Shift+Enter 直接更新编辑文本，仍可插入换行。
 tableElement.addEventListener("beforeinput", (event) => {
    if (
       event.target === activeEditorInput() &&
@@ -591,11 +590,15 @@ function runTableAction(action: TableAction): void {
       }
       return;
    }
-   if (action.kind === "insertCellLineBreak") {
+   if (action.kind === "insertCellLineBreak" || action.kind === "editCellHistory") {
       const input = activeEditorInput();
-      if (keyboardMode === "editing" && input) {
-         input.setRangeText("\n", input.selectionStart, input.selectionEnd, "end");
-         resizeEditor(input, editingCell);
+      if (keyboardMode === "editing" && input && document.activeElement === input) {
+         // 让换行与键入、删除和粘贴共用输入框的浏览器撤销历史。
+         if (action.kind === "insertCellLineBreak") {
+            document.execCommand("insertText", false, "\n");
+         } else {
+            document.execCommand(action.command);
+         }
       }
       return;
    }
@@ -1074,7 +1077,6 @@ function applyColumns(next: Snapshot): void {
          variableHeight: true,
          editor: "textarea",
          editorParams: () => ({
-            shiftEnterNewLine: true,
             verticalNavigation: "editor",
             elementAttributes: { rows: "1", wrap: "soft" },
          }),
