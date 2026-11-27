@@ -12,9 +12,12 @@ export type StructureMenuCommand =
    | "freezeCell"
    | "unfreezeCell";
 
+type CellTarget = { row: number; column: number; revision: number; version: number };
+
 export type TableAction =
    | { kind: "moveCellSelection" | "moveTableStructure"; direction: TableDirection }
-   | { kind: "editCell"; target?: { row: number; column: number; revision: number; version: number } }
+   | { kind: "editCell"; target?: CellTarget }
+   | { kind: "clearCell"; target?: CellTarget }
    | { kind: "prepareCacheReload" }
    | { kind: "insertCellLineBreak" }
    | {

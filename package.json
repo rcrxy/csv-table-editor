@@ -157,6 +157,11 @@
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'grid'"
             },
             {
+                "command": "delimgrid.clearCell",
+                "key": "delete",
+                "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.canMoveTableStructure"
+            },
+            {
                 "command": "delimgrid.insertCellLineBreak",
                 "key": "enter",
                 "when": "activeCustomEditorId == 'csv-table-editor.table' && csvTableEditor.keyboardMode == 'editing'"

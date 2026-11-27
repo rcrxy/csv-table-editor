@@ -50,14 +50,17 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
       }
    }
 
-   editCell(context: unknown): void {
+   runCellAction(kind: "editCell" | "clearCell", context: unknown): void {
       if (context === undefined) {
-         this.runTableAction({ kind: "editCell" });
+         this.runTableAction({ kind });
          return;
       }
+      const session = this.activeSession();
       if (
+         !session ||
          !isRecord(context) ||
          context.webview !== viewType ||
+         context.tableResource !== session.document.uri.toString() ||
          context.webviewSection !== "cell" ||
          typeof context.field !== "string" ||
          !/^c\d+$/.test(context.field)
@@ -66,8 +69,8 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
       }
       const { rowId, revision, version } = context;
       if (typeof rowId === "number" && typeof revision === "number" && typeof version === "number") {
-         this.runTableAction({
-            kind: "editCell",
+         session.runTableAction({
+            kind,
             target: { row: rowId, column: Number(context.field.slice(1)), revision, version },
          });
       }

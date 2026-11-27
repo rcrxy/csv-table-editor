@@ -493,17 +493,33 @@ function runTableAction(action: TableAction): void {
       }
       return;
    }
-   if (action.kind === "editCell") {
+   if (action.kind === "editCell" || action.kind === "clearCell") {
       if (editingCell) {
          return;
       }
+      let cell: CellComponent | undefined;
       if (action.target) {
          const { row, column, revision, version } = action.target;
          if (snapshot?.revision === revision && snapshot.version === version) {
-            cellAt(row, column)?.edit();
+            cell = cellAt(row, column);
          }
       } else if (keyboardMode === "grid") {
-         selectedOrFirstCell()?.edit();
+         if (selectedCell) {
+            cell = cellAt(selectedCell.row, selectedCell.column);
+         } else if (action.kind === "editCell") {
+            cell = selectedOrFirstCell();
+         }
+      }
+      if (!cell) {
+         return;
+      }
+      if (action.kind === "editCell") {
+         cell.edit();
+      } else {
+         const column = columnIndex(cell.getField());
+         if (column !== undefined && (cell.getValue() ?? "") !== "") {
+            send({ kind: "cell", row: Number(cell.getRow().getIndex()), column, value: "" });
+         }
       }
       return;
    }

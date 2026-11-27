@@ -27,7 +27,12 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.commands.registerCommand("delimgrid.toggleTextWrapping", (resource?: vscode.Uri) =>
          provider.toggleTextWrapping(resource),
       ),
-      vscode.commands.registerCommand("delimgrid.editCell", (context?: unknown) => provider.editCell(context)),
+      vscode.commands.registerCommand("delimgrid.editCell", (context?: unknown) =>
+         provider.runCellAction("editCell", context),
+      ),
+      vscode.commands.registerCommand("delimgrid.clearCell", (context?: unknown) =>
+         provider.runCellAction("clearCell", context),
+      ),
       ...structureMenuCommands.map((command) =>
          vscode.commands.registerCommand(`delimgrid.${command}`, (context: unknown) =>
             provider.editStructureFromMenu(command, context),
