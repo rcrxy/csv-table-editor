@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import { formatClipboardColumn } from "../core/ColumnClipboard";
 import { delimiters, delimiterError, detectDelimiter, parseDocument, type ParsedDocument } from "../core/CsvParser";
 import { documentEdits, encodeField } from "../core/DocumentEdits";
 import { GitGutter } from "../git/GitGutter";
@@ -87,7 +88,6 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
          return;
       }
       if (
-         (command === "renameColumn" && (context.webviewSection !== "header" || context.canRenameTableColumn !== true)) ||
          (command === "deleteRow" && context.canDeleteTableRow !== true) ||
          (command === "deleteColumn" && context.canDeleteTableColumn !== true) ||
          (command === "freezeCell" && context.canFreezePanes !== true) ||
@@ -106,21 +106,37 @@ export class CsvTableEditorProvider implements vscode.CustomTextEditorProvider {
       }
    }
 
-   async copyTableRange(context: unknown): Promise<void> {
+   async clipboardFromMenu(action: "copy" | "paste", context: unknown): Promise<void> {
       const session = this.activeSession();
       if (
          !session ||
          !isRecord(context) ||
          context.webview !== viewType ||
-         context.tableResource !== session.document.uri.toString() ||
-         context.canCopyTableRange !== true ||
-         typeof context.field !== "string" ||
-         typeof context.revision !== "number" ||
-         typeof context.version !== "number"
+         context.tableResource !== session.document.uri.toString()
       ) {
          return;
       }
-      await session.copyTableRange(context.field, context.rowId, context.revision, context.version);
+      const { field, revision, version } = context;
+      if (typeof field !== "string" || typeof revision !== "number" || typeof version !== "number") {
+         return;
+      }
+      if (action === "copy") {
+         if (context.canCopyTableRange === true) {
+            await session.copyTableRange(field, context.rowId, revision, version);
+         }
+         return;
+      }
+      if (context.webviewSection !== "header" || context.canPasteTableColumn !== true || !/^c\d+$/.test(field)) {
+         return;
+      }
+      try {
+         const text = await vscode.env.clipboard.readText();
+         if (text && this.activeSession() === session) {
+            session.runTableAction({ kind: "pasteTableColumn", column: Number(field.slice(1)), revision, version, text });
+         }
+      } catch {
+         void vscode.window.showErrorMessage("Could not read text from the clipboard.");
+      }
    }
 
    private activeSession(): DocumentController | undefined {
@@ -295,13 +311,7 @@ class DocumentController {
          if (column >= parsed.columnCount) {
             return;
          }
-         // 直接使用源文件的记录，保留第一条记录中最新的表头文本。
-         const values = parsed.rows.map((row) => row.values[column] ?? "");
-         text = values.join("\n");
-         if (values.length > 1 && values.at(-1) === "") {
-            // 额外保留结束符，使最后一个空单元格仍占一行。
-            text += "\n";
-         }
+         text = formatClipboardColumn(snapshot, column);
       }
       try {
          await vscode.env.clipboard.writeText(text);
@@ -556,10 +566,15 @@ class DocumentController {
       if (!parsed) {
          throw new Error("The document could not be parsed.");
       }
-      const editOperation =
-         operation.kind === "cell"
-            ? { ...operation, value: operation.value.replace(/\r\n|\r|\n/g, parsed.newline) }
-            : operation;
+      let editOperation: Exclude<Operation, { kind: "pasteTableColumn" }>;
+      if (operation.kind === "pasteTableColumn") {
+         const values = parseClipboardColumn(operation.text).map((value) => value.replace(/\r\n|\r|\n/g, parsed.newline));
+         editOperation = { kind: "pasteColumn", row: 0, column: operation.column, values };
+      } else if (operation.kind === "cell") {
+         editOperation = { ...operation, value: operation.value.replace(/\r\n|\r|\n/g, parsed.newline) };
+      } else {
+         editOperation = operation;
+      }
       const replacements = documentEdits(parsed, editOperation, this.snapshot.tableHeader);
       if (!replacements.length) {
          return;
@@ -586,6 +601,20 @@ class DocumentController {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
    return typeof value === "object" && value !== null;
+}
+
+function parseClipboardColumn(text: string): string[] {
+   if (/(?:^|[\r\n])"/.test(text)) {
+      try {
+         const { rows } = parseDocument(text, "\t", "\n");
+         if (rows.length && rows.every((row) => row.values.length === 1)) {
+            return rows.map((row) => row.values[0]);
+         }
+      } catch {
+         // 普通文本可能包含未闭合的引号，仍可按行粘贴。
+      }
+   }
+   return text.replace(/(?:\r\n|\r|\n)$/, "").split(/\r\n|\r|\n/);
 }
 
 function isWebviewMessage(value: unknown): value is WebviewMessage {
@@ -636,6 +665,8 @@ function isOperation(value: unknown): value is Operation {
             value.values.length > 1 &&
             value.values.every((line: unknown) => typeof line === "string")
          );
+      case "pasteTableColumn":
+         return hasColumn && typeof value.text === "string" && value.text.length > 0;
       case "deleteColumn":
          return hasColumn;
       case "deleteRow":

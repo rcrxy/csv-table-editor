@@ -2,6 +2,7 @@ import { TabulatorFull as Tabulator, type CellComponent, type ColumnDefinition, 
 import "tabulator-tables/dist/css/tabulator.min.css";
 import "./styles.css";
 import markup from "./body.html";
+import { formatClipboardColumn } from "../core/ColumnClipboard";
 import type {
    Direction,
    HostMessage,
@@ -114,7 +115,7 @@ table.on("headerClick", (event, column) => {
    if (!(event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement)) {
       const index = columnIndex(column.getField());
       clearCellSelection();
-      if (snapshot?.header && index !== undefined) {
+      if (index !== undefined) {
          selectRow(undefined);
       }
       selectColumn(index);
@@ -220,25 +221,39 @@ tableElement.addEventListener("compositionend", () => {
 // 快捷键和右键菜单沿用 VS Code 的原生剪贴板命令。
 window.addEventListener("copy", (event) => {
    const clipboard = event.clipboardData;
-   const cell = selectedCellForClipboard(event);
-   if (clipboard && cell) {
-      clipboard.setData("text/plain", String(cell.getValue() ?? ""));
+   if (!clipboard || !snapshot || !canUseGridClipboard(event)) {
+      return;
+   }
+   const column = selectedHeaderColumn();
+   const cell = selectedCell && cellAt(selectedCell.row, selectedCell.column);
+   const text = column === undefined ? cell && String(cell.getValue() ?? "") : formatClipboardColumn(snapshot, column);
+   if (text !== undefined) {
+      clipboard.setData("text/plain", text);
       event.preventDefault();
    }
 });
 
 window.addEventListener("paste", (event) => {
    const clipboard = event.clipboardData;
-   if (!clipboard?.types.includes("text/plain")) {
+   if (!clipboard?.types.includes("text/plain") || !canUseGridClipboard(event)) {
       return;
    }
-   const cell = selectedCellForClipboard(event);
+   const text = clipboard.getData("text/plain");
+   const headerColumn = selectedHeaderColumn();
+   if (headerColumn !== undefined) {
+      event.preventDefault();
+      if (text) {
+         send({ kind: "pasteTableColumn", column: headerColumn, text });
+      }
+      return;
+   }
+   const cell = selectedCell && cellAt(selectedCell.row, selectedCell.column);
    const column = cell && columnIndex(cell.getField());
    if (!cell || column === undefined) {
       return;
    }
    event.preventDefault();
-   const lines = clipboard.getData("text/plain").replace(/(?:\r\n|\r|\n)$/, "").split(/\r\n|\r|\n/);
+   const lines = text.replace(/(?:\r\n|\r|\n)$/, "").split(/\r\n|\r|\n/);
    const row = Number(cell.getRow().getIndex());
    if (lines.length > 1) {
       send({ kind: "pasteColumn", row, column, values: lines });
@@ -250,25 +265,27 @@ window.addEventListener("paste", (event) => {
    }
 });
 
-function selectedCellForClipboard(event: ClipboardEvent): CellComponent | undefined {
+function selectedHeaderColumn(): number | undefined {
+   return selectedRow === undefined && !selectedCell ? selectedColumn : undefined;
+}
+
+function canUseGridClipboard(event: ClipboardEvent): boolean {
    const target = event.target;
    if (
       !event.isTrusted ||
       event.defaultPrevented ||
       editingCell ||
       editingHeader ||
-      !selectedCell ||
-      snapshot?.error ||
+      !snapshot ||
+      snapshot.error ||
       pending !== undefined ||
       queuedSnapshots ||
       (target instanceof HTMLElement && (target.isContentEditable || target.closest("input, textarea")))
    ) {
-      return;
+      return false;
    }
    updateKeyboardMode();
-   if (keyboardMode === "grid") {
-      return cellAt(selectedCell.row, selectedCell.column);
-   }
+   return keyboardMode === "grid";
 }
 
 // Enter 和 Ctrl+Enter 由 VS Code 命令处理，挡住浏览器可能先插入的换行。
@@ -316,7 +333,7 @@ type MenuTarget =
 
 // 菜单定位使用源记录 ID。无表头时，删除列的入口取当前视图的第一行。
 function menuStructureOperation(
-   command: Exclude<StructureMenuCommand, "freezeCell" | "unfreezeCell" | "renameColumn">,
+   command: Exclude<StructureMenuCommand, "freezeCell" | "unfreezeCell">,
    field: string | undefined,
    rowId: number | undefined,
 ): Operation | undefined {
@@ -383,10 +400,10 @@ function setMenuTarget(element: HTMLElement, target: MenuTarget): void {
       version: snapshot?.version,
       tableResource: snapshot?.resource,
       canCopyTableRange,
+      canPasteTableColumn: canCopyTableRange && target.webviewSection === "header",
       preventDefaultContextMenuItems: canCopyTableRange,
       canFreezePanes: target.webviewSection === "cell" && !!freezePaneTarget(field, rowId),
       hasFrozenPanes: frozenRowCount > 0 || frozenColumnCount > 0,
-      canRenameTableColumn: target.webviewSection === "header" && !!snapshot?.header && !snapshot.error,
       canDeleteTableRow: !!menuStructureOperation("deleteRow", field, rowId),
       canDeleteTableColumn: !!menuStructureOperation("deleteColumn", field, rowId),
    });
@@ -536,15 +553,16 @@ function runTableAction(action: TableAction): void {
       }
       return;
    }
+   if (action.kind === "pasteTableColumn") {
+      if (snapshot?.revision === action.revision && snapshot.version === action.version) {
+         send({ kind: "pasteTableColumn", column: action.column, text: action.text });
+      }
+      return;
+   }
    if (action.kind === "editStructureFromMenu") {
       const { field, rowId, revision, version } = action.target;
       if (snapshot?.revision === revision && snapshot.version === version) {
-         if (action.command === "renameColumn") {
-            const column = field === undefined ? undefined : columnIndex(field);
-            if (column !== undefined && rowId === undefined) {
-               startHeaderEdit(column);
-            }
-         } else if (action.command === "freezeCell") {
+         if (action.command === "freezeCell") {
             const target = freezePaneTarget(field, rowId);
             if (target) {
                setFrozenPanes(target.rows, target.columns);
@@ -646,6 +664,7 @@ function startHeaderEdit(column: number): void {
    input.dataset.vscodeContext = JSON.stringify({
       webviewSection: "headerEditor",
       canCopyTableRange: false,
+      canPasteTableColumn: false,
       canDeleteTableColumn: false,
       preventDefaultContextMenuItems: false,
    });

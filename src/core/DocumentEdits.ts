@@ -33,7 +33,7 @@ function cellEdits(document: ParsedDocument, index: number, column: number, valu
 
 export function documentEdits(
    document: ParsedDocument,
-   operation: Operation,
+   operation: Exclude<Operation, { kind: "pasteTableColumn" }>,
    tableHeader: boolean,
 ): TextReplacement[] {
    const { rows, delimiter, newline, text, columnCount, bomLength } = document;
@@ -41,8 +41,8 @@ export function documentEdits(
    const last = rows.at(-1);
    if (operation.kind === "pasteColumn") {
       const { row, column, values } = operation;
-      if (!last || !Number.isInteger(row) || row < firstDataRow || row >= rows.length) {
-         throw new Error("Select a data record first.");
+      if (!last || !Number.isInteger(row) || row < 0 || row >= rows.length) {
+         throw new Error("Select a record first.");
       }
       if (!Number.isInteger(column) || column < 0 || column >= columnCount) {
          throw new Error("The selected column no longer exists.");

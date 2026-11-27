@@ -46,10 +46,6 @@
                 "enablement": "true"
             },
             {
-                "command": "delimgrid.renameColumn",
-                "title": "%command.renameColumn%"
-            },
-            {
                 "command": "delimgrid.moveCellSelection",
                 "title": "%command.moveCellSelection%"
             },
@@ -81,6 +77,10 @@
             {
                 "command": "delimgrid.copyTableRange",
                 "title": "%command.copyTableRange%"
+            },
+            {
+                "command": "delimgrid.pasteTableColumn",
+                "title": "%command.pasteTableColumn%"
             },
             {
                 "title": "%command.clearFilter%",
@@ -221,7 +221,6 @@
             "commandPalette": [
                 { "command": "delimgrid.toggleTextWrapping", "when": "false" },
                 { "command": "delimgrid.editCell", "when": "false" },
-                { "command": "delimgrid.renameColumn", "when": "false" },
                 { "command": "delimgrid.moveCellSelection", "when": "false" },
                 { "command": "delimgrid.moveColumnLeft", "when": "false" },
                 { "command": "delimgrid.moveColumnRight", "when": "false" },
@@ -230,6 +229,7 @@
                 { "command": "delimgrid.insertCellLineBreak", "when": "false" },
                 { "command": "delimgrid.clearCell", "when": "false" },
                 { "command": "delimgrid.copyTableRange", "when": "false" },
+                { "command": "delimgrid.pasteTableColumn", "when": "false" },
                 { "command": "delimgrid.clearFilter", "when": "false" },
                 { "command": "delimgrid.resetAllFilters", "when": "false" },
                 { "command": "delimgrid.freezeCell", "when": "false" },
@@ -246,11 +246,6 @@
                 {
                     "command": "delimgrid.editCell",
                     "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'cell'",
-                    "group": "1_cell@1"
-                },
-                {
-                    "command": "delimgrid.renameColumn",
-                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'header' && canRenameTableColumn",
                     "group": "1_cell@1"
                 },
                 {
@@ -292,6 +287,11 @@
                     "command": "delimgrid.copyTableRange",
                     "when": "webviewId == 'csv-table-editor.table' && canCopyTableRange",
                     "group": "5_cutcopypaste@2"
+                },
+                {
+                    "command": "delimgrid.pasteTableColumn",
+                    "when": "webviewId == 'csv-table-editor.table' && webviewSection == 'header' && canPasteTableColumn",
+                    "group": "5_cutcopypaste@3"
                 },
                 {
                     "command": "delimgrid.deleteRow",

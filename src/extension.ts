@@ -3,7 +3,6 @@ import { CsvTableEditorProvider, viewType } from "./editor/CsvTableEditorProvide
 import type { TableDirection } from "./shared/messages";
 
 const structureMenuCommands = [
-   "renameColumn",
    "insertRowAbove",
    "insertRowBelow",
    "insertColumnLeft",
@@ -34,7 +33,12 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.commands.registerCommand("delimgrid.clearCell", (context?: unknown) =>
          provider.runCellAction("clearCell", context),
       ),
-      vscode.commands.registerCommand("delimgrid.copyTableRange", (context: unknown) => provider.copyTableRange(context)),
+      vscode.commands.registerCommand("delimgrid.copyTableRange", (context: unknown) =>
+         provider.clipboardFromMenu("copy", context),
+      ),
+      vscode.commands.registerCommand("delimgrid.pasteTableColumn", (context: unknown) =>
+         provider.clipboardFromMenu("paste", context),
+      ),
       ...structureMenuCommands.map((command) =>
          vscode.commands.registerCommand(`delimgrid.${command}`, (context: unknown) =>
             provider.editStructureFromMenu(command, context),
