@@ -5,7 +5,7 @@
     "license": "SEE LICENSE IN LICENSE",
     "publisher": "zeco",
     "description": "%extension.description%",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "repository": {
         "type": "git",
         "url": "https://github.com/rcrxy/csv-table-editor.git"
@@ -24,8 +24,12 @@
                 "viewType": "csv-table-editor.table",
                 "displayName": "DelimGrid",
                 "selector": [
-                    { "filenamePattern": "*.csv" },
-                    { "filenamePattern": "*.tsv" }
+                    {
+                        "filenamePattern": "*.csv"
+                    },
+                    {
+                        "filenamePattern": "*.tsv"
+                    }
                 ],
                 "priority": "default"
             }
@@ -257,32 +261,110 @@
                 }
             ],
             "commandPalette": [
-                { "command": "delimgrid.toggleTextWrapping", "when": "false" },
-                { "command": "delimgrid.editCell", "when": "false" },
-                { "command": "delimgrid.moveCellSelection", "when": "false" },
-                { "command": "delimgrid.moveRowUp", "when": "false" },
-                { "command": "delimgrid.moveRowDown", "when": "false" },
-                { "command": "delimgrid.moveColumnLeft", "when": "false" },
-                { "command": "delimgrid.moveColumnRight", "when": "false" },
-                { "command": "delimgrid.submitCellEdit", "when": "false" },
-                { "command": "delimgrid.cancelCellEdit", "when": "false" },
-                { "command": "delimgrid.undoCellEdit", "when": "false" },
-                { "command": "delimgrid.redoCellEdit", "when": "false" },
-                { "command": "delimgrid.insertCellLineBreak", "when": "false" },
-                { "command": "delimgrid.clearCell", "when": "false" },
-                { "command": "delimgrid.copyTableRange", "when": "false" },
-                { "command": "delimgrid.pasteTableColumn", "when": "false" },
-                { "command": "delimgrid.clearFilter", "when": "false" },
-                { "command": "delimgrid.resetAllFilters", "when": "false" },
-                { "command": "delimgrid.freezeCell", "when": "false" },
-                { "command": "delimgrid.unfreezeCell", "when": "false" },
-                { "command": "delimgrid.insertRowAbove", "when": "false" },
-                { "command": "delimgrid.insertRowBelow", "when": "false" },
-                { "command": "delimgrid.insertColumnLeft", "when": "false" },
-                { "command": "delimgrid.insertColumnRight", "when": "false" },
-                { "command": "delimgrid.deleteRow", "when": "false" },
-                { "command": "delimgrid.deleteColumn", "when": "false" },
-                { "command": "delimgrid.clearAndReloadTable", "when": "false" }
+                {
+                    "command": "delimgrid.toggleTextWrapping",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.editCell",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.moveCellSelection",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.moveRowUp",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.moveRowDown",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.moveColumnLeft",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.moveColumnRight",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.submitCellEdit",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.cancelCellEdit",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.undoCellEdit",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.redoCellEdit",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.insertCellLineBreak",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.clearCell",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.copyTableRange",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.pasteTableColumn",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.clearFilter",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.resetAllFilters",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.freezeCell",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.unfreezeCell",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.insertRowAbove",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.insertRowBelow",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.insertColumnLeft",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.insertColumnRight",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.deleteRow",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.deleteColumn",
+                    "when": "false"
+                },
+                {
+                    "command": "delimgrid.clearAndReloadTable",
+                    "when": "false"
+                }
             ],
             "webview/context": [
                 {
