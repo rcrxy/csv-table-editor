@@ -1,4 +1,10 @@
-import { TabulatorFull as Tabulator, type CellComponent, type ColumnDefinition, type RowComponent } from "tabulator-tables";
+import {
+   TabulatorFull as Tabulator,
+   type CellComponent,
+   type ColumnComponent,
+   type ColumnDefinition,
+   type RowComponent,
+} from "tabulator-tables";
 import "tabulator-tables/dist/css/tabulator.min.css";
 import "./styles.css";
 import markup from "./body.html";
@@ -15,6 +21,7 @@ import type {
 } from "../shared/messages";
 import { measureInitialWidths } from "./columnWidths";
 import { GutterView } from "./GutterView";
+import { attachLastColumnResize } from "./LastColumnResize";
 
 declare function acquireVsCodeApi(): { postMessage(message: WebviewMessage): void };
 
@@ -36,6 +43,7 @@ let selectedCell: { row: number; column: number } | undefined;
 let frozenRowCount = 0;
 let frozenColumnCount = 0;
 let renderedColumns = "";
+let disposeLastColumnResize: (() => void) | undefined;
 let textWrapping = false;
 let editingCell: CellComponent | undefined;
 let editingHeader:
@@ -129,7 +137,9 @@ table.on("headerDblClick", (event, column) => {
       startHeaderEdit(index);
    }
 });
-table.on("columnResized", (column) => {
+table.on("columnResized", saveColumnWidth);
+
+function saveColumnWidth(column: ColumnComponent): void {
    const field = column.getField();
    const index = columnIndex(field);
    const width = Math.round(column.getWidth());
@@ -140,7 +150,7 @@ table.on("columnResized", (column) => {
    // Tabulator 重绘时会从列定义读取宽度，沿用用户刚调整的值。
    column.getDefinition().width = width;
    vscode.postMessage({ type: "columnResized", column: index, width });
-});
+}
 table.on("dataFiltered", (_filters, rows) => {
    if (selectedRow !== undefined && !rows.some((row) => Number(row.getIndex()) === selectedRow)) {
       selectRow(undefined);
@@ -1045,6 +1055,8 @@ function applyColumns(next: Snapshot): void {
    if (key === renderedColumns) {
       return;
    }
+   disposeLastColumnResize?.();
+   disposeLastColumnResize = undefined;
    measureInitialWidths(tableElement, next, widths);
    renderedColumns = key;
    const filters = table.getHeaderFilters().filter(({ field }) => (columnIndex(field) ?? Infinity) < headers.length);
@@ -1061,6 +1073,7 @@ function applyColumns(next: Snapshot): void {
          },
          field,
          frozen: index < frozenColumnCount,
+         ...(index === headers.length - 1 ? { resizable: false } : {}),
          width,
          minWidth: Math.min(80, next.cellMaxWidth, width),
          formatter: (cell) => {
@@ -1102,6 +1115,11 @@ function applyColumns(next: Snapshot): void {
    }
    table.clearHeaderFilter();
    table.setColumns(columns);
+   const lastColumn = headers.length && table.getColumn(`c${headers.length - 1}`);
+   const viewport = tableElement.querySelector<HTMLElement>(".tabulator-tableholder");
+   if (lastColumn && viewport) {
+      disposeLastColumnResize = attachLastColumnResize(lastColumn, viewport, saveColumnWidth);
+   }
    for (const { field, value } of filters) {
       table.setHeaderFilterValue(field, String(value));
    }
