@@ -450,11 +450,18 @@
                     "order": 2,
                     "description": "%configuration.tableHeader.description%"
                 },
-                "csv-table-editor.showRowNumbers": {
-                    "type": "boolean",
-                    "default": true,
+                "csv-table-editor.rowNumberMode": {
+                    "type": "string",
+                    "enum": ["none", "record", "source", "both"],
+                    "enumItemLabels": [
+                        "%configuration.rowNumberMode.none%",
+                        "%configuration.rowNumberMode.record%",
+                        "%configuration.rowNumberMode.source%",
+                        "%configuration.rowNumberMode.both%"
+                    ],
+                    "default": "both",
                     "order": 3,
-                    "description": "%configuration.showRowNumbers.description%"
+                    "description": "%configuration.rowNumberMode.description%"
                 }
             }
         }

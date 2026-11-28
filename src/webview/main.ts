@@ -363,7 +363,7 @@ function menuStructureOperation(
    }
    const column = columnIndex(field);
    if (command === "deleteRow") {
-      const rowControls = snapshot.showRowNumbers ? field === "_line" : column === 0;
+      const rowControls = snapshot.rowNumberMode === "none" ? column === 0 : field === "_line";
       if (rowControls && rowId !== undefined && rowId !== snapshot.placeholderRow && dataRecord(snapshot, rowId)) {
          return { kind: "deleteRow", row: rowId };
       }
@@ -1084,8 +1084,10 @@ function applyFrozenRows(): void {
 // 列结构变化时重建列，沿用列宽与仍存在的列的筛选值。
 function applyColumns(next: Snapshot): void {
    const headers = Array.from({ length: next.columnCount }, (_, index) => next.header?.values[index] ?? "");
-   const lineDigits = next.showRowNumbers ? Math.max(4, String(next.records.at(-1)?.line ?? 0).length) : undefined;
-   const key = JSON.stringify([next.tableHeader, headers, frozenColumnCount, lineDigits]);
+   const mode = next.rowNumberMode;
+   const recordDigits = mode === "record" || mode === "both" ? String(next.records.length).length : 0;
+   const sourceDigits = mode === "source" || mode === "both" ? String(next.records.at(-1)?.line ?? 0).length : 0;
+   const key = JSON.stringify([next.tableHeader, headers, frozenColumnCount, mode, recordDigits, sourceDigits]);
    if (key === renderedColumns) {
       return;
    }
@@ -1131,9 +1133,9 @@ function applyColumns(next: Snapshot): void {
          editable: () => !!snapshot && !snapshot.error && pending === undefined && !queuedSnapshots && !editingHeader,
       };
    });
-   // 可选的序列号列显示源文件行号和 Git 标记。数据列的字段名与它的显示状态无关。
-   if (lineDigits !== undefined) {
-      const lineWidth = gutter.measureWidth(lineDigits);
+   // 行号列仍使用独立字段，行号模式不影响数据列的字段名和 Git 标记定位。
+   if (mode !== "none") {
+      const lineWidth = gutter.measureWidth(mode, recordDigits, sourceDigits);
       columns.unshift({
          title: "#",
          titleFormatter: () => (next.header ? gutter.header() : asText("#")),
@@ -1144,7 +1146,11 @@ function applyColumns(next: Snapshot): void {
          resizable: false,
          hozAlign: "right",
          cssClass: "gutter-cell",
-         formatter: (cell) => gutter.record({ id: Number(cell.getRow().getIndex()), line: Number(cell.getValue()) }),
+         formatter: (cell) => {
+            const id = Number(cell.getRow().getIndex());
+            const sequence = next.tableHeader ? id : id + 1;
+            return gutter.record({ id, line: Number(cell.getValue()) }, sequence, mode);
+         },
       });
    }
    table.clearHeaderFilter();

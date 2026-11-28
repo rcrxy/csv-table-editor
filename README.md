@@ -56,7 +56,7 @@
 | --- | --- | --- |
 | `csv-table-editor.cellMaxCell` | `400` | 自动列宽的像素上限。打开文件时根据前 100 条数据估算列宽，优先恢复手动调整过的宽度。修改上限后重新打开文件即可应用。 |
 | `csv-table-editor.tableHeader` | `true` | 使用第一条记录作为表头。关闭后第一条记录显示在数据区，列名使用 `Column 1` 等默认名称。设置即时生效。 |
-| `csv-table-editor.showRowNumbers` | `true` | 显示每条记录在源文件中的起始行号。设置即时生效。 |
+| `csv-table-editor.rowNumberMode` | `both` | 不显示（`none`）、实际行号（`record`）、开始行号（`source`）或同时显示（`both`）。实际行号从第一条数据记录按 1 开始计数，同时显示时用小字标出源文件起始行。设置即时生效。 |
 
 在命令面板运行 **DelimGrid：选择分隔符**（**DelimGrid: Select Delimiter**），可以恢复自动识别、选择常见分隔符，或输入一个自定义分隔字符。自动识别不明确时，`.csv` 使用逗号，`.tsv` 使用制表符。手动选择会在当前工作区内按文件记忆。
 

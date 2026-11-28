@@ -224,7 +224,7 @@ class DocumentController {
          vscode.workspace.onDidChangeConfiguration((event) => {
             if (
                event.affectsConfiguration("csv-table-editor.tableHeader", document.uri) ||
-               event.affectsConfiguration("csv-table-editor.showRowNumbers", document.uri)
+               event.affectsConfiguration("csv-table-editor.rowNumberMode", document.uri)
             ) {
                this.sync(true);
             }
@@ -257,7 +257,7 @@ class DocumentController {
       }
       let text: string;
       if (field === "_line") {
-         if (!snapshot.showRowNumbers || typeof rowId !== "number" || !Number.isSafeInteger(rowId)) {
+         if (snapshot.rowNumberMode === "none" || typeof rowId !== "number" || !Number.isSafeInteger(rowId)) {
             return;
          }
          const row = snapshot.records[rowId - (snapshot.tableHeader ? 1 : 0)];
@@ -425,6 +425,7 @@ class DocumentController {
       const records = this.parsed?.rows.map((row, id) => ({ id, line: row.startLine, values: row.values })) ?? [];
       const config = vscode.workspace.getConfiguration("csv-table-editor", this.document.uri);
       const tableHeader = config.get<boolean>("tableHeader", true) !== false;
+      const rowNumberMode = config.get<string>("rowNumberMode");
       if (this.trailingPlaceholderRow !== records.length) {
          this.trailingPlaceholderRow = undefined;
       }
@@ -440,7 +441,8 @@ class DocumentController {
          autoDelimiter: this.manualDelimiter === undefined,
          cellMaxWidth: this.cellMaxWidth,
          tableHeader,
-         showRowNumbers: config.get<boolean>("showRowNumbers", true) !== false,
+         rowNumberMode:
+            rowNumberMode === "none" || rowNumberMode === "record" || rowNumberMode === "source" ? rowNumberMode : "both",
          placeholderRow,
          columnCount: placeholderRow === 0 ? 1 : (this.parsed?.columnCount ?? 0),
          header: tableHeader ? records[0] : undefined,

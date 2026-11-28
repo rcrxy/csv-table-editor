@@ -1,5 +1,7 @@
 import type { TabulatorFull } from "tabulator-tables";
-import type { GitMarker, GitStatus, Gutter, TableRecord } from "../shared/messages";
+import type { GitMarker, GitStatus, Gutter, RowNumberMode, TableRecord } from "../shared/messages";
+
+type VisibleRowNumberMode = Exclude<RowNumberMode, "none">;
 
 const statusNames: Record<GitStatus, string> = {
    added: "Added",
@@ -137,32 +139,49 @@ export class GutterView {
       }
    }
 
-   measureWidth(digits: number): number {
+   measureWidth(mode: VisibleRowNumberMode, recordDigits: number, sourceDigits: number): number {
       const sample = document.createElement("span");
       sample.className = "record-gutter";
       sample.style.position = "absolute";
       sample.style.visibility = "hidden";
       sample.style.boxSizing = "content-box";
-      sample.style.width = `${digits}ch`;
+      sample.style.minWidth = "4ch";
+      sample.style.width = "max-content";
+      sample.append(this.numbers(mode, "0".repeat(recordDigits), "0".repeat(sourceDigits)));
       this.tableElement.append(sample);
       const width = Math.ceil(sample.getBoundingClientRect().width);
       sample.remove();
       // 测量结果包含行号的留白，再计入单元格右侧边框。
-      return width > 0 ? width + 1 : digits * 8 + 15;
+      return width > 0 ? width + 1 : Math.max(4, recordDigits + sourceDigits) * 8 + 15;
    }
 
-   record(record: Pick<TableRecord, "id" | "line">): HTMLElement {
+   record(record: Pick<TableRecord, "id" | "line">, sequence: number, mode: VisibleRowNumberMode): HTMLElement {
       const element = document.createElement("span");
       element.className = "record-gutter";
-      this.paint(element, record.id, String(record.line), `Source line ${record.line}`);
+      element.append(this.numbers(mode, String(sequence), String(record.line)));
+      this.paintMarkers(element, record.id, `Record ${sequence} · Source line ${record.line}`);
       return element;
    }
 
    header(): HTMLElement {
       const element = document.createElement("span");
       element.className = "record-gutter header-gutter";
-      this.paint(element, 0, "#", "Header record");
+      element.textContent = "#";
+      this.paintMarkers(element, 0, "Header record");
       return element;
+   }
+
+   private numbers(mode: VisibleRowNumberMode, sequence: string, line: string): HTMLElement {
+      const label = document.createElement("span");
+      label.className = "row-number-label";
+      label.textContent = mode === "source" ? line : sequence;
+      if (mode === "both") {
+         const source = document.createElement("span");
+         source.className = "row-number-source";
+         source.textContent = line;
+         label.append(source);
+      }
+      return label;
    }
 
    update(gutter: Gutter | undefined, headerRecord?: number): void {
@@ -191,7 +210,7 @@ export class GutterView {
 
       const header = this.tableElement.querySelector<HTMLElement>(".header-gutter");
       if (header) {
-         this.paint(header, 0, "#", "Header record");
+         this.paintMarkers(header, 0);
       }
       // 更新新旧标记涉及的行，清除旧标记。尚未渲染的行会在格式化时读取当前标记。
       for (const id of new Set([...previous.keys(), ...this.markers.keys()])) {
@@ -201,26 +220,27 @@ export class GutterView {
          const row = this.table.getRow(id);
          const element = row && row.getElement().querySelector<HTMLElement>(".record-gutter");
          if (element) {
-            const line = Number(element.dataset.line);
-            this.paint(element, id, String(line), `Source line ${line}`);
+            this.paintMarkers(element, id);
          }
       }
       this.end.hidden = !this.markers.has(null);
-      this.paint(this.end, null, "Deletion at end of file", "End of file");
+      this.end.textContent = "Deletion at end of file";
+      this.paintMarkers(this.end, null, "End of file");
    }
 
-   private paint(element: HTMLElement, row: number | null, text: string, label: string): void {
+   private paintMarkers(element: HTMLElement, row: number | null, label = element.dataset.label ?? ""): void {
       const markers = this.markers.get(row) ?? [];
       const statuses = [...new Set(markers.map(({ status }) => status))];
-      element.dataset.line = text;
+      element.dataset.label = label;
       element.title = [label, ...statuses.map((status) => statusNames[status])].join(" · ");
-      element.replaceChildren();
+      element.querySelectorAll(":scope > .gutter-strip").forEach((strip) => strip.remove());
+      const strips = document.createDocumentFragment();
       for (const status of statuses) {
          const strip = document.createElement("span");
          strip.className = `gutter-strip ${status}`;
          strip.setAttribute("aria-hidden", "true");
-         element.append(strip);
+         strips.append(strip);
       }
-      element.append(document.createTextNode(text));
+      element.prepend(strips);
    }
 }

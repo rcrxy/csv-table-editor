@@ -256,6 +256,18 @@ button:focus-visible,
    padding: 3px 7px;
 }
 
+.row-number-label {
+   display: inline-flex;
+   align-items: baseline;
+   gap: 4px;
+   white-space: nowrap;
+   font-variant-numeric: tabular-nums;
+}
+
+.row-number-source {
+   font-size: 0.75em;
+}
+
 .header-gutter {
    text-align: right;
 }

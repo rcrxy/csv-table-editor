@@ -2,6 +2,7 @@ export type Direction = -1 | 1;
 
 export type TableDirection = "up" | "down" | "left" | "right";
 export type KeyboardMode = "inactive" | "grid" | "editing" | "composing";
+export type RowNumberMode = "none" | "record" | "source" | "both";
 export type StructureMenuCommand =
    | "insertRowAbove"
    | "insertRowBelow"
@@ -67,7 +68,7 @@ export interface Snapshot {
    autoDelimiter: boolean;
    cellMaxWidth: number;
    tableHeader: boolean;
-   showRowNumbers: boolean;
+   rowNumberMode: RowNumberMode;
    placeholderRow?: number;
    columnCount: number;
    header: TableRecord | undefined;
