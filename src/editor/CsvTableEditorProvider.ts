@@ -1,9 +1,10 @@
 import * as vscode from "vscode";
 import { formatClipboardColumn } from "../core/ColumnClipboard";
 import { delimiters, delimiterError, detectDelimiter, parseDocument, type ParsedDocument } from "../core/CsvParser";
-import { documentEdits, encodeField } from "../core/DocumentEdits";
+import { documentEdits, encodeField, type TextReplacement } from "../core/DocumentEdits";
 import { GitGutter } from "../git/GitGutter";
 import type {
+   DocumentOperation,
    HostMessage,
    KeyboardMode,
    Operation,
@@ -175,6 +176,7 @@ class DocumentController {
    private autoDelimiter: string | undefined;
    private parsed: ParsedDocument | undefined;
    private snapshot!: Snapshot;
+   private trailingPlaceholderRow: number | undefined;
    private ready = false;
    private disposed = false;
    private editing = false;
@@ -255,19 +257,14 @@ class DocumentController {
       }
       let text: string;
       if (field === "_line") {
-         if (
-            !snapshot.showRowNumbers ||
-            typeof rowId !== "number" ||
-            !Number.isSafeInteger(rowId) ||
-            rowId < (snapshot.tableHeader ? 1 : 0)
-         ) {
+         if (!snapshot.showRowNumbers || typeof rowId !== "number" || !Number.isSafeInteger(rowId)) {
             return;
          }
-         const row = parsed.rows[rowId];
+         const row = snapshot.records[rowId - (snapshot.tableHeader ? 1 : 0)];
          if (!row) {
             return;
          }
-         text = Array.from({ length: parsed.columnCount }, (_, column) => encodeField(row.values[column] ?? "", "\t")).join(
+         text = Array.from({ length: snapshot.columnCount }, (_, column) => encodeField(row.values[column] ?? "", "\t")).join(
             "\t",
          );
       } else {
@@ -275,7 +272,7 @@ class DocumentController {
             return;
          }
          const column = Number(field.slice(1));
-         if (column >= parsed.columnCount) {
+         if (column >= snapshot.columnCount) {
             return;
          }
          text = formatClipboardColumn(snapshot, column);
@@ -428,6 +425,13 @@ class DocumentController {
       const records = this.parsed?.rows.map((row, id) => ({ id, line: row.startLine, values: row.values })) ?? [];
       const config = vscode.workspace.getConfiguration("csv-table-editor", this.document.uri);
       const tableHeader = config.get<boolean>("tableHeader", true) !== false;
+      if (this.trailingPlaceholderRow !== records.length) {
+         this.trailingPlaceholderRow = undefined;
+      }
+      const placeholderRow = this.parsed && records.length === 0 ? 0 : this.trailingPlaceholderRow;
+      if (placeholderRow !== undefined) {
+         records.push({ id: placeholderRow, line: (this.parsed?.rows.at(-1)?.endLine ?? 0) + 1, values: [""] });
+      }
       this.snapshot = {
          revision: (this.snapshot?.revision ?? 0) + 1,
          version: this.document.version,
@@ -437,7 +441,8 @@ class DocumentController {
          cellMaxWidth: this.cellMaxWidth,
          tableHeader,
          showRowNumbers: config.get<boolean>("showRowNumbers", true) !== false,
-         columnCount: this.parsed?.columnCount ?? 0,
+         placeholderRow,
+         columnCount: placeholderRow === 0 ? 1 : (this.parsed?.columnCount ?? 0),
          header: tableHeader ? records[0] : undefined,
          records: tableHeader ? records.slice(1) : records,
          error,
@@ -450,6 +455,24 @@ class DocumentController {
          this.post({ type: "snapshot", snapshot: this.snapshot });
          this.git.schedule();
       }
+   }
+
+   private showTrailingPlaceholder(): void {
+      const parsed = this.parsed;
+      const last = parsed?.rows.at(-1);
+      if (!parsed || !last || this.snapshot.placeholderRow !== undefined) {
+         return;
+      }
+      const id = parsed.rows.length;
+      this.trailingPlaceholderRow = id;
+      this.snapshot = {
+         ...this.snapshot,
+         revision: this.snapshot.revision + 1,
+         placeholderRow: id,
+         records: [...this.snapshot.records, { id, line: last.endLine + 1, values: [""] }],
+      };
+      this.post({ type: "snapshot", snapshot: this.snapshot });
+      this.git.schedule();
    }
 
    private post(message: HostMessage): void {
@@ -506,6 +529,9 @@ class DocumentController {
             }
          }
          this.sync();
+         if (!error && message.type === "edit" && message.operation.kind === "continueAfterLastRow") {
+            this.showTrailingPlaceholder();
+         }
          if (error) {
             this.post({ type: "snapshot", snapshot: this.snapshot });
          }
@@ -533,16 +559,44 @@ class DocumentController {
       if (!parsed) {
          throw new Error("The document could not be parsed.");
       }
-      let editOperation: Exclude<Operation, { kind: "pasteTableColumn" }>;
+      let editOperation: DocumentOperation;
+      const { tableHeader, placeholderRow } = this.snapshot;
+      const commitPlaceholderHeader =
+         operation.kind === "continueAfterLastRow" && placeholderRow === 0 && operation.row === this.snapshot.header?.id;
       if (operation.kind === "pasteTableColumn") {
          const values = parseClipboardColumn(operation.text).map((value) => value.replace(/\r\n|\r|\n/g, parsed.newline));
          editOperation = { kind: "pasteColumn", row: 0, column: operation.column, values };
-      } else if (operation.kind === "cell") {
-         editOperation = { ...operation, value: operation.value.replace(/\r\n|\r|\n/g, parsed.newline) };
+      } else if (operation.kind === "continueAfterLastRow") {
+         if (
+            !commitPlaceholderHeader &&
+            operation.row !== parsed.rows.length - 1 &&
+            operation.row !== this.snapshot.records.at(-1)?.id
+         ) {
+            throw new Error("Select the last record first.");
+         }
+         if (operation.value === undefined && !commitPlaceholderHeader) {
+            return;
+         }
+         editOperation = { kind: "cell", row: operation.row, column: operation.column, value: operation.value ?? "" };
       } else {
          editOperation = operation;
       }
-      const replacements = documentEdits(parsed, editOperation, this.snapshot.tableHeader);
+      if (editOperation.kind === "cell") {
+         const value = editOperation.value.replace(/\r\n|\r|\n/g, parsed.newline);
+         if (placeholderRow !== undefined && placeholderRow > 0 && editOperation.row === placeholderRow) {
+            if (value === "") {
+               return;
+            }
+            editOperation = { kind: "pasteColumn", row: placeholderRow, column: editOperation.column, values: [value] };
+         } else {
+            editOperation = { ...editOperation, value };
+         }
+      } else if (editOperation.kind === "addRow" && placeholderRow && editOperation.before === placeholderRow + 1) {
+         editOperation = { kind: "addRow", before: placeholderRow };
+      }
+      const replacements = placeholderRow === 0
+         ? initializeDocumentEdits(parsed, editOperation, tableHeader, commitPlaceholderHeader)
+         : documentEdits(parsed, editOperation, tableHeader);
       if (!replacements.length) {
          return;
       }
@@ -568,6 +622,28 @@ class DocumentController {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
    return typeof value === "object" && value !== null;
+}
+
+function initializeDocumentEdits(
+   document: ParsedDocument,
+   operation: DocumentOperation,
+   tableHeader: boolean,
+   commitPlaceholderHeader: boolean,
+): TextReplacement[] {
+   if (operation.kind === "deleteRow") {
+      return [];
+   }
+   let text = document.text + encodeField("", document.delimiter, true);
+   const initialized = parseDocument(text, document.delimiter, document.newline);
+   const edits = documentEdits(initialized, operation, tableHeader);
+   if (!edits.length && !commitPlaceholderHeader) {
+      return [];
+   }
+   // 先在内存中应用编辑，再一次性写入原文档，避免产生中间快照和撤销记录。
+   for (const edit of edits.reverse()) {
+      text = text.slice(0, edit.start) + edit.text + text.slice(edit.end);
+   }
+   return [{ start: document.bomLength, end: document.text.length, text: text.slice(document.bomLength) }];
 }
 
 function parseClipboardColumn(text: string): string[] {
@@ -625,6 +701,8 @@ function isOperation(value: unknown): value is Operation {
    switch (value.kind) {
       case "cell":
          return hasRow && hasColumn && typeof value.value === "string";
+      case "continueAfterLastRow":
+         return hasRow && hasColumn && (value.value === undefined || typeof value.value === "string");
       case "pasteColumn":
          return (
             hasRow &&

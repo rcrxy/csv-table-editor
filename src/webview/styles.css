@@ -238,6 +238,10 @@ button:focus-visible,
    font-weight: normal;
 }
 
+.tabulator.placeholder-header .tabulator-tableholder .tabulator-placeholder {
+   display: none;
+}
+
 /* 左侧冻结列承载源文件行号和 Git 标记，末尾删除单独显示。 */
 .tabulator .tabulator-row .tabulator-cell.gutter-cell {
    padding: 0;

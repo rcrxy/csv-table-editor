@@ -1,4 +1,4 @@
-import type { Operation } from "../shared/messages";
+import type { DocumentOperation } from "../shared/messages";
 import type { ParsedDocument } from "./CsvParser";
 
 export interface TextReplacement {
@@ -12,6 +12,11 @@ export function encodeField(value: string, delimiter: string, quoted = false): s
       return `"${value.replaceAll('"', '""')}"`;
    }
    return value;
+}
+
+function emptyRecordAtEnd(columnCount: number, delimiter: string): string {
+   // 给末列的空字段加引号，避免保存时裁掉整行或 TSV 的尾部分隔符。
+   return delimiter.repeat(columnCount - 1) + '""';
 }
 
 function cellEdits(document: ParsedDocument, index: number, column: number, value: string): TextReplacement[] {
@@ -33,7 +38,7 @@ function cellEdits(document: ParsedDocument, index: number, column: number, valu
 
 export function documentEdits(
    document: ParsedDocument,
-   operation: Exclude<Operation, { kind: "pasteTableColumn" }>,
+   operation: DocumentOperation,
    tableHeader: boolean,
 ): TextReplacement[] {
    const { rows, delimiter, newline, text, columnCount, bomLength } = document;
@@ -41,7 +46,7 @@ export function documentEdits(
    const last = rows.at(-1);
    if (operation.kind === "pasteColumn") {
       const { row, column, values } = operation;
-      if (!last || !Number.isInteger(row) || row < 0 || row >= rows.length) {
+      if (!last || !Number.isInteger(row) || row < 0 || row > rows.length) {
          throw new Error("Select a record first.");
       }
       if (!Number.isInteger(column) || column < 0 || column >= columnCount) {
@@ -54,9 +59,8 @@ export function documentEdits(
          const before = delimiter.repeat(column);
          const after = delimiter.repeat(columnCount - column - 1);
          const eol = last.eol || newline;
-         const records = overflow.map(
-            (value) => before + encodeField(value, delimiter, columnCount === 1 && value === "") + after,
-         );
+         const blank = emptyRecordAtEnd(columnCount, delimiter);
+         const records = overflow.map((value) => (value === "" ? blank : before + encodeField(value, delimiter) + after));
          const insertion = last.eol ? records.join(eol) + eol : eol + records.join(eol);
          // 文件最后一个字段也被修改时，将追加内容合并到同一个文本替换。
          const finalEdit = edits.at(-1);
@@ -83,7 +87,7 @@ export function documentEdits(
          const blank = columnCount === 1 ? '""' : delimiter.repeat(columnCount - 1);
          return [{ start: following.start, end: following.start, text: blank + (following.eol || newline) }];
       }
-      const blank = columnCount === 1 && !last.eol ? '""' : delimiter.repeat(columnCount - 1);
+      const blank = emptyRecordAtEnd(columnCount, delimiter);
       const insertion = last.eol ? blank + last.eol : newline + blank;
       return [{ start: text.length, end: text.length, text: insertion }];
    }

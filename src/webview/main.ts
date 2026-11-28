@@ -36,7 +36,7 @@ const widths = new Map<string, number>();
 let snapshot: Snapshot | undefined;
 let pending: number | undefined;
 let reloadAfterEdit = false;
-let selectionAfterEdit: { row: number; column: number } | undefined;
+let selectionAfterEdit: { row?: number; column: number } | undefined;
 let selectedRow: number | undefined;
 let selectedColumn: number | undefined;
 let selectedCell: { row: number; column: number } | undefined;
@@ -353,6 +353,9 @@ function menuStructureOperation(
       if (rowId !== undefined && dataRecord(snapshot, rowId)) {
          return { kind: "addRow", before: command === "insertRowAbove" ? rowId : rowId + 1 };
       }
+      if (command === "insertRowBelow" && rowId === undefined && field !== undefined && snapshot.header) {
+         return { kind: "addRow", before: snapshot.header.id + 1 };
+      }
       return;
    }
    if (field === undefined) {
@@ -361,7 +364,7 @@ function menuStructureOperation(
    const column = columnIndex(field);
    if (command === "deleteRow") {
       const rowControls = snapshot.showRowNumbers ? field === "_line" : column === 0;
-      if (rowControls && rowId !== undefined && dataRecord(snapshot, rowId)) {
+      if (rowControls && rowId !== undefined && rowId !== snapshot.placeholderRow && dataRecord(snapshot, rowId)) {
          return { kind: "deleteRow", row: rowId };
       }
       return;
@@ -411,6 +414,7 @@ function setMenuTarget(element: HTMLElement, target: MenuTarget): void {
       canCopyTableRange,
       canPasteTableColumn: canCopyTableRange && target.webviewSection === "header",
       preventDefaultContextMenuItems: canCopyTableRange,
+      canInsertRowBelow: target.webviewSection === "header" && !!menuStructureOperation("insertRowBelow", field, rowId),
       canFreezePanes: target.webviewSection === "cell" && !!freezePaneTarget(field, rowId),
       hasFrozenPanes: frozenRowCount > 0 || frozenColumnCount > 0,
       canDeleteTableRow: !!menuStructureOperation("deleteRow", field, rowId),
@@ -485,7 +489,10 @@ window.addEventListener("message", ({ data }: MessageEvent<HostMessage>) => {
          } else if (shouldReload) {
             vscode.postMessage({ type: "clearAndReload" });
          } else if (nextSelection) {
-            selectAndRevealCell(nextSelection.row, nextSelection.column);
+            const row = nextSelection.row ?? snapshot?.placeholderRow;
+            if (row !== undefined) {
+               selectAndRevealCell(row, nextSelection.column);
+            }
          }
       } else if (data.type === "gutter" && data.revision === snapshot?.revision) {
          gutter.update(data.gutter, snapshot?.header?.id);
@@ -718,9 +725,17 @@ function submitHeaderEdit(save: boolean, moveToNextRow = false, restoreFocus = f
    const { row, column, input, value: original } = editingHeader;
    const value = input.value;
    const nextRow = moveToNextRow ? table.getRows("active")[0] : undefined;
+   const openPlaceholder = moveToNextRow && !nextRow && snapshot?.records.length === 0;
+   const changed = value !== original;
+   let operation: Operation | undefined;
+   if (openPlaceholder) {
+      operation = { kind: "continueAfterLastRow", row, column, value: changed ? value : undefined };
+   } else if (changed) {
+      operation = { kind: "cell", row, column, value };
+   }
    closeHeaderEditor(restoreFocus);
-   if (send(value === original ? undefined : { kind: "cell", row, column, value }, save)) {
-      selectionAfterEdit = nextRow ? { row: Number(nextRow.getIndex()), column } : undefined;
+   if (send(operation, save)) {
+      selectionAfterEdit = openPlaceholder ? { column } : nextRow ? { row: Number(nextRow.getIndex()), column } : undefined;
    }
 }
 
@@ -742,12 +757,23 @@ function submitCellEdit(save: boolean, moveToNextRow = false): void {
    const nextSelection = nextRow ? { row: Number(nextRow.getIndex()), column } : undefined;
    const value = input.value;
    const original = String(cell.getValue() ?? "").replace(/\r\n?/g, "\n");
+   const changed = value !== original;
+   const nextIsPlaceholder = nextSelection?.row === row + 1 && nextSelection.row === snapshot?.placeholderRow;
+   const openPlaceholder =
+      nextIsPlaceholder ||
+      (moveToNextRow && !nextRow && snapshot?.records.at(-1)?.id === row && (changed || snapshot.placeholderRow !== row));
+   let operation: Operation | undefined;
+   if (openPlaceholder) {
+      operation = { kind: "continueAfterLastRow", row, column, value: changed ? value : undefined };
+   } else if (changed) {
+      operation = { kind: "cell", row, column, value };
+   }
    // 退出 Tabulator 的输入框，草稿通过既有的文档编辑流程提交。
    cell.cancelEdit();
    tableElement.focus({ preventScroll: true });
-   if (send(value === original ? undefined : { kind: "cell", row, column, value }, save)) {
-      selectionAfterEdit = nextSelection;
-   } else if (!save && value === original && nextSelection) {
+   if (send(operation, save)) {
+      selectionAfterEdit = openPlaceholder ? { column } : nextSelection;
+   } else if (!save && !operation && nextSelection) {
       selectAndRevealCell(nextSelection.row, nextSelection.column);
    }
 }
@@ -960,6 +986,11 @@ function dataRecord(view: Snapshot, id: number | undefined) {
    return id === undefined ? undefined : view.records[id - (view.tableHeader ? 1 : 0)];
 }
 
+function fileDataRowCount(view: Snapshot): number {
+   const last = view.records.at(-1);
+   return last && last.id === view.placeholderRow ? view.records.length - 1 : view.records.length;
+}
+
 // 行移动依赖源文件顺序，筛选生效时暂停行移动。
 function moveSelection(vertical: boolean, direction: Direction): void {
    if (!snapshot || !selectedCell) {
@@ -971,6 +1002,9 @@ function moveSelection(vertical: boolean, direction: Direction): void {
       refreshControls();
    } else if (vertical) {
       const next = row + direction;
+      if (row === snapshot.placeholderRow || next === snapshot.placeholderRow) {
+         return;
+      }
       if (dataRecord(snapshot, next) && send({ kind: "moveRow", row, direction })) {
          selectCell(next, column);
          const target = table.getRow(next);
@@ -1139,8 +1173,8 @@ async function render(next: Snapshot): Promise<void> {
          next.error ||
          next.delimiter !== previous.delimiter ||
          next.tableHeader !== previous.tableHeader ||
-         next.records.length !== previous.records.length ||
-         next.records.some(({ line }, index) => line !== previous.records[index].line)
+         fileDataRowCount(next) !== fileDataRowCount(previous) ||
+         next.records.some(({ id, line }, index) => id !== next.placeholderRow && line !== previous.records[index]?.line)
       ) {
          gutter.update(undefined);
       }
@@ -1151,6 +1185,7 @@ async function render(next: Snapshot): Promise<void> {
       }
    }
    snapshot = next;
+   tableElement.classList.toggle("placeholder-header", next.placeholderRow === 0 && next.tableHeader);
    if (next.error) {
       await table.replaceData([]);
       return;

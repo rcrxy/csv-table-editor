@@ -32,6 +32,7 @@ export type TableAction =
 
 export type Operation =
    | { kind: "cell"; row: number; column: number; value: string }
+   | { kind: "continueAfterLastRow"; row: number; column: number; value?: string }
    | { kind: "pasteColumn"; row: number; column: number; values: string[] }
    | { kind: "pasteTableColumn"; column: number; text: string }
    | { kind: "addRow"; before?: number }
@@ -40,6 +41,8 @@ export type Operation =
    | { kind: "addColumn"; before?: number }
    | { kind: "deleteColumn"; column: number }
    | { kind: "moveColumn"; column: number; direction: Direction };
+
+export type DocumentOperation = Exclude<Operation, { kind: "pasteTableColumn" | "continueAfterLastRow" }>;
 
 export type WebviewMessage =
    | { type: "ready" }
@@ -65,6 +68,7 @@ export interface Snapshot {
    cellMaxWidth: number;
    tableHeader: boolean;
    showRowNumbers: boolean;
+   placeholderRow?: number;
    columnCount: number;
    header: TableRecord | undefined;
    records: TableRecord[];

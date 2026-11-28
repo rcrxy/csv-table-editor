@@ -394,7 +394,7 @@
                 },
                 {
                     "command": "delimgrid.insertRowBelow",
-                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'row')",
+                    "when": "webviewId == 'csv-table-editor.table' && (webviewSection == 'cell' || webviewSection == 'row' || (webviewSection == 'header' && canInsertRowBelow))",
                     "group": "4_row@2"
                 },
                 {
