@@ -5,7 +5,7 @@
     "license": "SEE LICENSE IN LICENSE",
     "publisher": "zeco",
     "description": "%extension.description%",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "repository": {
         "type": "git",
         "url": "https://github.com/rcrxy/csv-table-editor.git"
@@ -452,7 +452,12 @@
                 },
                 "csv-table-editor.rowNumberMode": {
                     "type": "string",
-                    "enum": ["none", "record", "source", "both"],
+                    "enum": [
+                        "none",
+                        "record",
+                        "source",
+                        "both"
+                    ],
                     "enumItemLabels": [
                         "%configuration.rowNumberMode.none%",
                         "%configuration.rowNumberMode.record%",
